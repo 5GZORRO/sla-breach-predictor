@@ -26,12 +26,14 @@ class ModelManager():
         __base_algorithms['arima'] = BaseARIMA
         
     
-    def construct_model_entity(pipeline_id, metric, threshold, model_data) -> ModelEntity:
+    def construct_model_entity(pipeline_id, rule) -> ModelEntity:
        global __base_algorithms
        md.register_pipeline(pipeline_id)
+       metric = rule.get('metric')
+       threshold = rule.get('tolerance')
+       model_data = rule.get('model_data')
        if model_data is not None:
            base = model_data.get('base')
-           spec = model_data.get('spec')
            model_entity = __base_algorithms.get(base).get_specification(model_data)
        else:
            model_entity = UnivariateLSTM(model_data)
@@ -41,9 +43,9 @@ class ModelManager():
        return model_entity
    
     def save_model(pipeline_id, model_entity: ModelEntity):
-        model_id = model_entity.get_id()
+        model_id = model_entity.id
         path = cnf.SAVE
-        path = fm.create_path_if_not_exists(path+'/'+pipeline_id+'/'+model_id)
+        path = fm.create_path_if_not_exists(path+'/'+str(pipeline_id)+'/'+model_id)
         date = datetime.now().strftime("%d-%m-%Y_%H-%M")
         version = date
         model_entity.get_model().save(path/version)

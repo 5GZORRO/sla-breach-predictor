@@ -12,16 +12,16 @@ from config.config import Config as cnf
 import threading
 import time
 import json
+from exceptions.exceptions import MetricNotFoundException
 from datetime import datetime
 
 class ActivePipeline():
     
-    def __init__(self, _id, metric, threshold, model_data = None) -> None:
-        self.id = _id
-        self.models = {}
-        model_entity = manager.construct_model_entity(_id, metric, threshold, model_data)
-        self.models[model_entity.id] = model_entity
-        self.consumer = Consumer()
+    def __init__(self, _id, name, description, rules) -> None:
+        self.id = int(_id)
+        self.name = name
+        self.description = description
+        self.models = self.__extract_rules__(self.id, rules)
         
 ######### ONLY FOR TESTING PURPOSES ########
         
@@ -41,21 +41,32 @@ class ActivePipeline():
     
     def start_training(self, model_entity):
         logging.info('Started thread with id: %s', threading.current_thread().ident)
-        counter = 0
+        # consumer = Consumer()
+        # consumer.subscribe(cnf.MON_TOPIC)
         model_entity.active_training = True
-        while(model_entity.active_training):
-            counter += 1
-            logging.info("Training round: %s", counter)
-            try:
-               model_entity.train()
-               manager.save_model(self.id, model_entity)
-               model_entity.model_available = True
-               model_entity.new_model = True
-               result = "Model successfully saved"
-            except Exception as ex:
-               result = "Error during model training or saving: " + str(ex)
         
+        while(model_entity.active_training):
+            
+            try:
+                # dataset = list()
+                # msg_pack = consumer.get_records(5)
+                # for tp, messages in msg_pack.items():
+                #     for message in messages:
+                #         dct = message.value.decode('utf-8')
+                #         data = json.loads(dct)
+                #         metric = data[model_entity.metric]
+                #         dataset.append(float(metric))
+                model_entity.train()
+                manager.save_model(self.id, model_entity)
+                model_entity.model_available = True
+                model_entity.new_model = True
+                model_entity.active_training = False
+                result = "Model successfully saved"
+            except Exception as ex:
+                result = "Error during model training or saving: " + str(ex)
+                
             logging.info(result)
+        
             time.sleep(cnf.TR_TMT)
         
         logging.info("Training concluded...")
@@ -64,6 +75,8 @@ class ActivePipeline():
         counter = 0
         _round = 0
         model_entity.active_prediction = True
+        consumer = Consumer()
+        consumer.subscribe(cnf.MON_TOPIC)
         
         while(not model_entity.model_available):
             counter += 1
@@ -72,9 +85,11 @@ class ActivePipeline():
         
         logging.info('STARTING PREDICTION CYCLE')
         
+        metrics = list()
+        dates = list()
+        
         while(model_entity.active_prediction):
             _round += 1
-            # logging.info('Prediction No. %s', _round)
             if(model_entity.new_model):
                 load_result, saved_model = manager.load_model(self.id, model_entity.get_id())
                 if saved_model != None:
@@ -84,26 +99,41 @@ class ActivePipeline():
                     logging.error("Could not load new model. %s", load_result)
             
             try:
-                msg_pack = self.consumer.get(model_entity.n_steps)
-                for tp, messages in msg_pack.items():
-                    metrics = list()
-                    dates = list()
-                    for message in messages:
-                        dct = message.value.decode('utf-8')
-                        data = json.loads(dct)
-                        dates.append(data['time'])
-                        metrics.append(float(data[model_entity.metric]))
-                    prediction = model_entity.predict(metrics)
-                    if prediction > model_entity.threshold:
-                        timestamp = str(dates[len(dates)-1])[:-5]
-                        timestamp = int(timestamp)+60000
-                        date = datetime.fromtimestamp(timestamp)
-                        notification = 'Predicted violation of threshold '+str(model_entity.threshold)+' with value: '+str(prediction)+ ' at '+str(date)
-                        Producer.send(notification)
+                for message in consumer.consumer:
+                    dct = message.value.decode('utf-8')
+                    data = json.loads(dct)
+                    #     result_array = data.get('data').get('result')
+                    #     for item in result_array:
+                    #         metric = item.get('metric')
+                    #         if metric is not None:
+                    #             name = metric.get('__name__')
+                    #             if name != model_entity.metric:
+                    #                 continue
+                    #             else:
+                    #                 value = item.get('value')
+                    #                 dates.append(value[0])
+                    #                 metrics.append(float(value[1]))
+                    dates.append(data['time'])
+                    metric = data[model_entity.metric]
+                    if metric is not None:
+                        metrics.append(float(metric))
+                    else:
+                        raise MetricNotFoundException(model_entity.metric)
+                    if len(metrics) < model_entity.n_steps:
+                        continue
+                    else:
+                        prediction = model_entity.predict(metrics)
+                        metrics.pop(0)
+                        if prediction > model_entity.threshold:
+                            timestamp = str(dates[len(dates)-1])[:-5]
+                            timestamp = int(timestamp)+60
+                            date = datetime.fromtimestamp(timestamp)
+                            notification = 'Predicted violation of threshold '+str(model_entity.threshold)+' with value: '+str(prediction)+ ' at '+str(date)
+                            Producer.send(notification)
             except Exception as e:
                 logging.error('Error during prediction process: %s', str(e))
             
-            time.sleep(cnf.PRD_TMT)
+            # time.sleep(cnf.PRD_TMT)
         
         logging.info('PREDICTION CYCLE ENDED')
         
@@ -130,9 +160,9 @@ class ActivePipeline():
         except Exception as ex:
             logging.error(str(ex))
         
-    def __extract_model_data__(self, pipeline_id, operations):
+    def __extract_rules__(self, pipeline_id, rules):
         models = {}
-        for data in operations:
-            model_entity = manager.construct_model_entity(pipeline_id, data)
+        for rule in rules:
+            model_entity = manager.construct_model_entity(pipeline_id, rule)
             models[model_entity.id] = model_entity
         return models

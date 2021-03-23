@@ -16,9 +16,9 @@ from keras.layers import Bidirectional, LSTM, Dense
 import statsmodels.api as sm
 from config.config import Config as cnf
 from file.file_manager import FileManager as fm
-import matplotlib
-import matplotlib.pyplot as plt
-matplotlib.use('Agg')
+# import matplotlib
+# import matplotlib.pyplot as plt
+# matplotlib.use('Agg')
 from datetime import datetime
 from exceptions.exceptions import PathNotFoundException
 
@@ -80,7 +80,6 @@ class BaseLSTM(ModelEntity):
         return self.name
     
     
-    
     def __init__(self, model_data):
         super().__init__()
         if model_data is not None:
@@ -118,7 +117,13 @@ class BaseLSTM(ModelEntity):
         
     
     
-    def train(self, data = None, attr = None):
+    def train(self):
+        # print("TRAINING STARTED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+        # print('Data size: ', len(data))
+        # X, y = self.split_sequence(data, self.n_steps)
+        # X = X.reshape((X.shape[0], X.shape[1], self.n_features))
+        # self.model.fit(X, y, epochs=200, verbose=0)
+        # print("TRAINING ENDED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
         print("TRAINING STARTED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
         data_path = cnf.DATA
         if fm.path_exists(data_path):
@@ -133,41 +138,29 @@ class BaseLSTM(ModelEntity):
         X = X.reshape((X.shape[0], X.shape[1], self.n_features))
         self.model.fit(X, y, epochs=200, verbose=0)
         print("TRAINING ENDED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        # self.predict()
-        # test = test.to_numpy().tolist()
-        # bwcol = train.to_numpy()
-        # bwrow = bwcol.tolist()
-        # dataset = bwcol.reshape(-1, 1)
-        # scaler = MinMaxScaler(feature_range=(-1, 1))
-        # scaler.fit(dataset)
-        # new = scaler.transform(dataset)
-        
-        # trans_list = list()
-        # for i in range(len(new)):
-        #     trans_list.append(new[i][0])
 
     
-    def predict(self):
-        print("STARTED PREDICTION:  " , datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        errors = list()
-        data = pd.read_csv('data/logfile.log')
-        server = "216.66.13.235:8088"
-        srv = data.loc[data['server'] == server]
-        train, test = self.extract_data(srv)
-        x_input = train[-self.n_steps:]
-        iterations = len(test)
+    # def predict(self):
+    #     print("STARTED PREDICTION:  " , datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+    #     errors = list()
+    #     data = pd.read_csv('data/logfile.log')
+    #     server = "216.66.13.235:8088"
+    #     srv = data.loc[data['server'] == server]
+    #     train, test = self.extract_data(srv)
+    #     x_input = train[-self.n_steps:]
+    #     iterations = len(test)
 
-        for i in range(iterations):
-            X = np.array([x_input[i:i+self.n_steps]])
-            inp = X.reshape((X.shape[0], X.shape[1], self.n_features))
-            yhat = self.model.predict(inp, verbose=0)
-            real_value = test[i:i+self.out]
-            x_input.append(real_value[0])
-            error = np.abs(yhat[0]-real_value[0])
-            errors.append(error)
+    #     for i in range(iterations):
+    #         X = np.array([x_input[i:i+self.n_steps]])
+    #         inp = X.reshape((X.shape[0], X.shape[1], self.n_features))
+    #         yhat = self.model.predict(inp, verbose=0)
+    #         real_value = test[i:i+self.out]
+    #         x_input.append(real_value[0])
+    #         error = np.abs(yhat[0]-real_value[0])
+    #         errors.append(error)
             
-        print("ENDED PREDICTION:  " , datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        print('Mean error: ', sum(errors)/len(errors))
+    #     print("ENDED PREDICTION:  " , datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+    #     print('Mean error: ', sum(errors)/len(errors))
         
         # steps_ahead = self.out
         # count = 0
@@ -224,22 +217,22 @@ class BaseLSTM(ModelEntity):
         # print("Mean error: ", avg_error)
         # self.calculate_and_plot_error(predictions, real_values, error_list)
     
-    def calculate_and_plot_error(self, predictions, test_data, errors):
-        print("PLOTTING STARTED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+    # def calculate_and_plot_error(self, predictions, test_data, errors):
+    #     print("PLOTTING STARTED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
 
-        figure1 = plt.figure(figsize=(15 ,5))
-        plt.plot(test_data, "r", label="Real Values")
-        plt.plot(predictions, "b", label="Predictions")
-        # plt.ylim(0, 5000)
-        plt.plot(errors, "g", label="Absolute Error")
-        plt.title(str(self.n_steps)+'-'+str(self.out)+' Prediction & Error')
-        plt.xlabel('Time')
-        plt.ylabel('Bandwidth (Mbps)')
-        figure1.legend(loc="lower left")
-        plt.grid(True)
-        figure1.savefig(str(self.n_steps)+'-'+str(self.out)+'.png')
+    #     figure1 = plt.figure(figsize=(15 ,5))
+    #     plt.plot(test_data, "r", label="Real Values")
+    #     plt.plot(predictions, "b", label="Predictions")
+    #     # plt.ylim(0, 5000)
+    #     plt.plot(errors, "g", label="Absolute Error")
+    #     plt.title(str(self.n_steps)+'-'+str(self.out)+' Prediction & Error')
+    #     plt.xlabel('Time')
+    #     plt.ylabel('Bandwidth (Mbps)')
+    #     figure1.legend(loc="lower left")
+    #     plt.grid(True)
+    #     figure1.savefig(str(self.n_steps)+'-'+str(self.out)+'.png')
         
-        print("PLOTTING ENDED:  ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+    #     print("PLOTTING ENDED:  ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
         
 
 class UnivariateLSTM(BaseLSTM):
@@ -283,37 +276,6 @@ class UnivariateLSTM(BaseLSTM):
         yhat = self.model.predict(inp, verbose=0)
         prediction = yhat[0][0]
         return prediction
-        # print("STARTED PREDICTION FOR UNIVARIATE LSTM:  " , datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        # predictions = list()
-        # steps_ahead = self.out
-        # # errors = [0] * steps_ahead
-        # # error_list = list()
-        # errors = list()
-        # data = pd.read_csv('data/logfile.log')
-        # server = "216.66.13.235:8088"
-        # srv = data.loc[data['server'] == server]
-        # train, test = self.extract_data(srv)
-        # x_input = train[-self.n_steps:]
-        # iterations = len(test)
-        # count = 0
-        
-        # for i in range(iterations -steps_ahead +1):
-        #       count = count + 1
-        #       X = np.array([x_input[i  :i + self.n_steps]])
-        #       inp = X.reshape((X.shape[0], X.shape[1], self.n_features))
-        #       yhat = self.model.predict(inp, verbose=0)
-        #       real_values = test[i : i + steps_ahead]
-        #       x_input.extend(real_values)
-        #       predictions.extend(yhat[0])
-        #       error = np.abs(np.subtract(yhat[0], real_values))
-        #       errors.append(error)
-        #       # errors = np.array(error) + np.array(errors)
-        #       # error_list.append(error[0])
-
-        # print("ENDED PREDICTION FOR UNIVARIATE LSTM:  " , datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        # # print('Mean error per step ahead: ', np.array(errors)/count)
-        # print('Mean error per step ahead: ', sum(errors)/len(errors))
-        # # self.calculate_and_plot_error(predictions, test, errors)
     
 
 class MultivariateLSTM(BaseLSTM):
@@ -329,6 +291,7 @@ class MultivariateLSTM(BaseLSTM):
     optimizer = 'adam'
     loss = 'mse'
     algorithm_type = 'MutilvariateLSTM'
+    attributes = None
         
     def split_sequence(self, sequence, n_steps):
        

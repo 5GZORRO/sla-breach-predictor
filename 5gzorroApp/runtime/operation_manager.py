@@ -24,6 +24,14 @@ class OperationManager():
         global registry
         operations = registry.get(pipeline_id)
         operations[thread.name] = thread
+        OperationManager.count += 1
+    
+    def remove_operation(pipeline_id, thread_names):
+        global registry
+        operations = registry.get(pipeline_id)
+        for thread_name in thread_names:
+            del operations[thread_name]
+            OperationManager.count -= 1
     
     def create_operations(pipeline, models):
         global registry
@@ -39,9 +47,7 @@ class OperationManager():
                 threads.append(train_thread)
                 threads.append(predict_thread)
                 OperationManager.register_operation(pipeline.id, train_thread)
-                OperationManager.count += 1
                 OperationManager.register_operation(pipeline.id, predict_thread)
-                OperationManager.count += 1
         
         return threads
     
@@ -53,10 +59,16 @@ class OperationManager():
     
     def start_operation_with_id(pipeline, model_id):
         global registry
-        # TODO
+        model = pipeline.models.get(model_id)
+        predict_thread = threading.Thread(target = pipeline.start_predicting, args=(model,))
+        predict_thread.name = model.id
+        predict_thread.daemon = True
+        predict_thread.start()
+        
     
-    def terminate_operations(pipeline_id, thread_id = None):
+    def terminate_operations(pipeline_id, thread_id):
         global registry
+        to_remove = list()
         pipeline = registry.get(pipeline_id)
         if pipeline != None:
             if thread_id != None:
@@ -65,13 +77,17 @@ class OperationManager():
                 if res > 1:
                     ctypes.pythonapi.PyThreadState_SetAsyncExc(thread.ident, 0)
                 else:
-                    del pipeline[thread_id]
+                    to_remove.apend(thread_id)
             else:
                 for thread_name in pipeline:
                     thread = pipeline.get(thread_name)
                     res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread.ident,  ctypes.py_object(SystemExit))
                     if res > 1:
                         ctypes.pythonapi.PyThreadState_SetAsyncExc(thread.ident, 0)
+                    else:
+                        to_remove.append(thread_name)
+        
+        OperationManager.remove_operation(pipeline_id, to_remove)
         
         
     def is_active(pipeline_id):

@@ -23,7 +23,6 @@ def on_startup():
     logging.info("Loading configuration...")
     Config.load_configuration()
     Producer.init()
-    Producer.send('Service connected')
     Handler.init()
     ModelManager.init()
     ModelDescriptor.init()
@@ -90,10 +89,10 @@ def stop_prediction_cycle(params: ClientData):
 
 @app.post('/service/training/terminate')
 def stop_training_cycle(params: ClientData):
-    pipeline = Handler.get_active_pipeline(params.unique_id)
+    pipeline = Handler.get_active_pipeline(params.id)
     result = None
     if pipeline == None:
-        result = "Operation "+"'"+params.unique_id+"' "+"does not exist."
+        result = "Operation "+"'"+params.id+"' "+"does not exist."
     elif not pipeline.models.get(params.model_id).active_training:
         result = 'Training is already inactive for this operation.'
     else:
@@ -103,46 +102,29 @@ def stop_training_cycle(params: ClientData):
     return Response(result, media_type = Media.TEXT_PLAIN)
 
 @app.post('/service/terminate')
-def terminate_pipeline(params: ClientData):
-    pipeline = Handler.get_active_pipeline(params.unique_id)
+async def terminate_pipeline(request: Request):
+    data = await request.json()
+    pipeline = Handler.get_active_pipeline(data['id'])
     result = None
     if pipeline == None:
-        result = "Operation "+"'"+params.unique_id+"' "+"does not exist."
+        result = "Operation "+"'"+pipeline.id+"' "+"does not exist."
     else:
-        if OperationManager.is_active(pipeline.id):
-            result = Handler.terminate(pipeline)
-            Handler.remove_pipeline(pipeline.id)
-        else:
-            Handler.remove_pipeline(pipeline.id)
+        result = Handler.terminate(pipeline.id)
     
     return Response(result, media_type = Media.TEXT_PLAIN)
     
 
 @app.post('/service/start')
-async def get_train(request: Request, background_tasks: BackgroundTasks):
+async def start_pipeline(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
     pipeline = Handler.create_new_pipeline(data)
     result = Handler.start_pipeline(pipeline)
     return Response(result, media_type = Media.TEXT_PLAIN)
 
-############################### ONLY FOR TESTING PURPOSES ###########################
-
-@app.post('/service/train')
-def train(params: ClientData, background_tasks: BackgroundTasks):
-    pipeline = Handler.create_new_pipeline(params)
-    pipeline.set_active_training(True)
-    background_tasks.add_task(pipeline.start_training)
-    return Response('Training started...', media_type = Media.TEXT_PLAIN)
-
-@app.post('/service/predict')
-def predict(params: ClientData, background_tasks: BackgroundTasks):
-    pipeline = Handler.get_or_create(params)
-    
-    background_tasks.add_task(pipeline.predict)
-    return Response('Prediction started...', media_type = Media.TEXT_PLAIN)
-
-#####################################################################################
-
+@app.get('/service/get_pipeline/{pipeline_id}')
+def get_pipeline(pipeline_id: int):
+    result = Handler.get_pipeline(pipeline_id)
+    return Response(result, media_type = Media.APP_JSON)
 
 @app.post('/service/update')
 async def update_pipeline(request: Request):
@@ -162,10 +144,29 @@ def configure_algorithm(params: ClientData, background_tasks: BackgroundTasks):
     return Response(result, media_type = Media.TEXT_PLAIN)
 
 @app.get('/get-active-list')
-def get_active_predictions(params: ClientData):
-    # active_list = Handler.get_active_list()
-    count = OperationManager.get_global_active_count()
-    return Response(str(count), media_type = Media.APP_JSON)
+def get_active_predictions():
+    active_list = Handler.get_active_list()
+    # count = OperationManager.get_global_active_count()
+    return Response(active_list, media_type = Media.APP_JSON)
+
+
+############################### ONLY FOR TESTING PURPOSES ###########################
+
+@app.post('/service/train')
+def train(params: ClientData, background_tasks: BackgroundTasks):
+    pipeline = Handler.create_new_pipeline(params)
+    pipeline.set_active_training(True)
+    background_tasks.add_task(pipeline.start_training)
+    return Response('Training started...', media_type = Media.TEXT_PLAIN)
+
+@app.post('/service/predict')
+def predict(params: ClientData, background_tasks: BackgroundTasks):
+    pipeline = Handler.get_or_create(params)
+    
+    background_tasks.add_task(pipeline.predict)
+    return Response('Prediction started...', media_type = Media.TEXT_PLAIN)
+
+#####################################################################################
 
 
 class Media():

@@ -33,8 +33,8 @@ class Handler():
     
     def create_new_pipeline(data):
         global __active_ops
-        rule = data.get('_rule')
-        pipeline = ActivePipeline(data.get('_name'), rule.get('metric'), rule.get('tolerance'))
+        rules = data.get('_rules')
+        pipeline = ActivePipeline(data.get('id'), data.get('_name'), data.get('description'), rules)
         __active_ops[pipeline.id] = pipeline
         om.register_pipeline(pipeline.id)
         return pipeline
@@ -44,14 +44,14 @@ class Handler():
         pipeline = __active_ops.get(_id)
         return pipeline
     
-    def get_or_create(data: ClientData):
-        global __active_ops
-        pipeline = __active_ops.get(data.unique_id)
-        if pipeline is None:
-            pipeline = ActivePipeline(data.unique_id, data.operations)
-            __active_ops[data.unique_id] = pipeline
-            om.register_pipeline(pipeline.id)
-        return pipeline
+    # def get_or_create(data: ClientData):
+    #     global __active_ops
+    #     pipeline = __active_ops.get(data.unique_id)
+    #     if pipeline is None:
+    #         pipeline = ActivePipeline(data.unique_id, data.operations)
+    #         __active_ops[data.unique_id] = pipeline
+    #         om.register_pipeline(pipeline.id)
+    #     return pipeline
     
     def start_pipeline(pipeline):
         threads_list = None
@@ -83,19 +83,12 @@ class Handler():
     
     def remove_pipeline(pipeline_id):
         global __active_ops
-        try:
-            del __active_ops[pipeline_id]
-            om.deregister_pipeline(pipeline_id)
-            result = 'Stopping pipeline...'
-        except Exception as e:
-            result = 'Unable to remove pipeline: ', str(e)
-        
-        return result
+        del __active_ops[pipeline_id]
     
-    def terminate(pipeline, thread_id = None, clean_up = True):
+    def terminate(pipeline_id, thread_id = None, clean_up = True):
         result = None
         try:
-            om.terminate_operations(pipeline.id, thread_id)
+            om.terminate_operations(pipeline_id, thread_id)
             result = 'Termination was sucessful.'
         except Exception as e:
             result = str(e)
@@ -103,11 +96,9 @@ class Handler():
         if clean_up:
            
             try:
-                pipeline.consumer.unsubscribe()
-                pipeline.consumer.close()
-                # TODO: release subscriptions
+                om.deregister_pipeline(pipeline_id)
+                Handler.remove_pipeline(pipeline_id)
                 # TODO: ModelDescriptor to_history
-                # TODO: deregister from operation manager
             except Exception as e:
                 result = str(e)
         
@@ -115,7 +106,7 @@ class Handler():
     
     def update_pipeline(data):
         global __active_ops
-        pipeline_id = data.get('unique_id')
+        pipeline_id = data.get('id')
         update_type = data.get('update_type')
         pipeline = __active_ops.get(pipeline_id)
         result = None
@@ -137,7 +128,7 @@ class Handler():
                 except Exception as e:
                     result = str(e)
         else:
-            result = "Operation "+"'"+pipeline_id+"' "+"does not exist."
+            result = "Pipeline "+"'"+pipeline_id+"' "+"does not exist."
         
         return 'Update status: '+result
     
@@ -146,18 +137,50 @@ class Handler():
         global __active_ops
         
         # Initialize an empty list
-        active_list = list()
+        active_list = {}
         
         for entry in __active_ops:
             pipeline = __active_ops.get(entry)
-            model_entity = pipeline.get_model_entity()
-            json_object = {'id' : pipeline.id, 
-                           'model' : {
-                               'id' : model_entity.get_id(),
-                               'algorithm' : model_entity.base(),
-                               'type' : model_entity.name()}}
-            active_list.append(json_object)
+            operations = pipeline.models
+            op_list = list()
+            for operation_id in operations:
+                op = {}
+                operation = pipeline.models.get(operation_id)
+                op['id'] = operation.id
+                op['metric'] = operation.metric
+                op['threshold'] = operation.threshold
+                op['algorithm'] = operation.base
+                op['type'] = operation.name
+                op_list.append(op)
+                
+            json_object = {'name' : pipeline.name,
+                           'description' : pipeline.description,
+                           'operations' : op_list
+                           }
+            active_list[pipeline.id] = json_object
         
         return json.dumps(active_list)
+    
+    def get_pipeline(pipeline_id):
+        global __active_ops
+        pipeline = __active_ops.get(pipeline_id)
+        if pipeline is not None:
+            result = {}
+            result['id'] = pipeline.id
+            operations = list()
+            for model_id in pipeline.models:
+                operation = {}
+                model_entity = pipeline.models.get(model_id)
+                operation['model_id'] = model_entity.id
+                operation['algorithm'] = model_entity.base.upper() + '-'+ model_entity.name.upper()
+                operation['metric'] = model_entity.metric
+                operation['threshold'] = model_entity.threshold
+                operations.append(operation)
+            result['operations'] = operations
+            result = json.dumps(result)
+        else:
+            result = "Pipeline "+"'"+str(pipeline_id)+"' "+"does not exist."
+        
+        return result
         
 
