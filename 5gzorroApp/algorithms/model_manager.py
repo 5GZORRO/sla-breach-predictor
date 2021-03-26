@@ -15,6 +15,8 @@ from datetime import datetime
 import logging
 
 
+log = logging.getLogger(__name__)
+
 class ModelManager():
     
     __base_algorithms = None

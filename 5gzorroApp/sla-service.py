@@ -149,6 +149,11 @@ def get_active_predictions():
     # count = OperationManager.get_global_active_count()
     return Response(active_list, media_type = Media.APP_JSON)
 
+@app.get('/get-thread-count')
+def get_thread_count():
+    count = OperationManager.get_global_active_count()
+    return Response(str(count), media_type = Media.APP_JSON)
+
 
 ############################### ONLY FOR TESTING PURPOSES ###########################
 

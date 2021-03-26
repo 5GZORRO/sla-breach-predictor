@@ -6,6 +6,9 @@ Created on Wed Mar  3 12:07:26 2021
 """
 import threading
 import ctypes
+import logging
+
+log = logging.getLogger(__name__)
 
 class OperationManager():
     registry = None
@@ -57,12 +60,12 @@ class OperationManager():
                 t.daemon = True
                 t.start()
     
-    def start_operation_with_id(pipeline, model_id):
+    def start_operation_with_id(pipeline, model, thread_id):
         global registry
-        model = pipeline.models.get(model_id)
         predict_thread = threading.Thread(target = pipeline.start_predicting, args=(model,))
-        predict_thread.name = model.id
+        predict_thread.name = thread_id
         predict_thread.daemon = True
+        OperationManager.register_operation(pipeline.id, predict_thread)
         predict_thread.start()
         
     
@@ -77,7 +80,7 @@ class OperationManager():
                 if res > 1:
                     ctypes.pythonapi.PyThreadState_SetAsyncExc(thread.ident, 0)
                 else:
-                    to_remove.apend(thread_id)
+                    to_remove.append(thread_id)
             else:
                 for thread_name in pipeline:
                     thread = pipeline.get(thread_name)

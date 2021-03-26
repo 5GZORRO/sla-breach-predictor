@@ -117,7 +117,7 @@ class BaseLSTM(ModelEntity):
         
     
     
-    def train(self):
+    def train(self, data):
         # print("TRAINING STARTED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
         # print('Data size: ', len(data))
         # X, y = self.split_sequence(data, self.n_steps)
@@ -125,18 +125,19 @@ class BaseLSTM(ModelEntity):
         # self.model.fit(X, y, epochs=200, verbose=0)
         # print("TRAINING ENDED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
         print("TRAINING STARTED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        data_path = cnf.DATA
-        if fm.path_exists(data_path):
-            data = pd.read_csv(data_path+"/"+'logfile.log')
-        else:
-            raise PathNotFoundException(str(data_path))
+        print(len(data))
+        # data_path = cnf.DATA
+        # if fm.path_exists(data_path):
+        #     data = pd.read_csv(data_path+"/"+'logfile.log')
+        # else:
+        #     raise PathNotFoundException(str(data_path))
          
-        server = "216.66.13.235:8088"
-        srv = data.loc[data['server'] == server]
-        train,test = self.extract_data(srv)
-        X, y = self.split_sequence(train, self.n_steps)
-        X = X.reshape((X.shape[0], X.shape[1], self.n_features))
-        self.model.fit(X, y, epochs=200, verbose=0)
+        # server = "216.66.13.235:8088"
+        # srv = data.loc[data['server'] == server]
+        # train,test = self.extract_data(srv)
+        # X, y = self.split_sequence(train, self.n_steps)
+        # X = X.reshape((X.shape[0], X.shape[1], self.n_features))
+        # self.model.fit(X, y, epochs=200, verbose=0)
         print("TRAINING ENDED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
 
     

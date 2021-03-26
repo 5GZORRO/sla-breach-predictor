@@ -11,15 +11,22 @@ import logging
 from config.config import Config as cnf
 
 
+log = logging.getLogger(__name__)
+
 class Consumer():
+    
+    counter = -1
     
     def __init__(self):
         self.topic = None
         self.partition = None
+        self.partition_number = 0
         try:
             host = cnf.KAFKA_HOST
             port = cnf.KAFKA_PORT
             self.consumer = KafkaConsumer(group_id = 'sla-breach-predictor', bootstrap_servers = host+ ":"+ port)
+            Consumer.counter += 1
+            self.partition_number = Consumer.counter
         except NoBrokersAvailable as nba:
             logging.info(str(nba))
             

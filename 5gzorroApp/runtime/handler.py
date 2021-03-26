@@ -16,6 +16,9 @@ from runtime.active_pipeline import ActivePipeline
 from runtime.operation_manager import OperationManager as om
 import json
 import time
+import logging
+
+log = logging.getLogger(__name__)
 
 class ClientData(BaseModel):
 
@@ -92,6 +95,7 @@ class Handler():
             result = 'Termination was sucessful.'
         except Exception as e:
             result = str(e)
+            log.error(result)
             
         if clean_up:
            
@@ -101,32 +105,46 @@ class Handler():
                 # TODO: ModelDescriptor to_history
             except Exception as e:
                 result = str(e)
+                log.error(result)
         
         return result
     
     def update_pipeline(data):
         global __active_ops
-        pipeline_id = data.get('id')
-        update_type = data.get('update_type')
+        pipeline_id = data['id']
+        updates = data['updates']
         pipeline = __active_ops.get(pipeline_id)
         result = None
-        if pipeline != None:
-            if update_type == 'remove':
-                pass
-            elif update_type == 'update':
-                update_data = data.get('data')
-                model = pipeline.models.get(update_data[0].get('id'))
-                thread_id = model.id+'-predict'
-                termination_result = Handler.terminate(pipeline, thread_id = thread_id, clean_up = False)
-                time.sleep(1) # wait one second to stop thread asynchronously before restarting
-                model.active_prediction = False
-                model.threshold = int(update_data[0].get('threshold'))
-                result = 'Terminated prediction thread with status: '+termination_result
-                try:
-                    om.start_operation_with_id(pipeline.id, thread_id)
-                    result = 'Sucessfully restarted prediction thread'
-                except Exception as e:
-                    result = str(e)
+        if pipeline != None: 
+            for update in updates:
+                update_type = update['update_type']
+                model = pipeline.models.get(update['model_id'])
+                threshold = int(update['threshold'])
+                metric = update['metric']
+                if update_type == 'remove':
+                    pass
+                elif update_type == 'update':
+                    if metric is not None: # Threads need to be restarted
+                        predict_thread_id = model.id+'-predict'
+                        train_thread_id = model.id+'-train'
+                        model.active_prediction = False
+                        termination_result = Handler.terminate(pipeline.id, thread_id = predict_thread_id, clean_up = False)
+                        time.sleep(1) # wait one second to stop thread asynchronously before restarting
+                        model.active_training = False
+                        termination_result = Handler.terminate(pipeline.id, thread_id = train_thread_id, clean_up = False)
+                        time.sleep(1) # wait one second to stop thread asynchronously before restarting
+                        result = 'Terminated threads with status: '+termination_result
+                        try:
+                            model.metric = metric
+                            model.threshold = threshold
+                            # om.start_operation_with_id(pipeline, model, thread_id)
+                            result = 'Sucessfully restarted prediction thread'
+                        except Exception as e:
+                            result = str(e)
+                            log.error(result)
+                    else:
+                        model.threshold = threshold
+                        
         else:
             result = "Pipeline "+"'"+pipeline_id+"' "+"does not exist."
         
