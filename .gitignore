@@ -4,4 +4,6 @@
 
 5gzorroApp/save
 
-5gzorroApp/"python image"
+5gzorroApp/python*image
+
+5gzorroApp/requirements.txt

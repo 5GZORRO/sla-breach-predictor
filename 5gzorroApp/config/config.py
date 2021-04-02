@@ -51,8 +51,3 @@ class Config():
         Config.BREACH_TOPIC = __conf['kafka']['breach_topic']
         
         
-    
-    def get_property(group: str, prop: str):
-        global __conf
-        return __conf[group][prop]
-        

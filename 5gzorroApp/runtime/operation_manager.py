@@ -22,6 +22,10 @@ class OperationManager():
         global registry
         operations = {}
         registry[pipeline_id] = operations
+        
+    def deregister_pipeline(pipeline_id):
+        global registry
+        del registry[pipeline_id]
     
     def register_operation(pipeline_id, thread):
         global registry
@@ -62,25 +66,26 @@ class OperationManager():
     
     def start_operation_with_id(pipeline, model, thread_id):
         global registry
-        predict_thread = threading.Thread(target = pipeline.start_predicting, args=(model,))
-        predict_thread.name = thread_id
-        predict_thread.daemon = True
-        OperationManager.register_operation(pipeline.id, predict_thread)
-        predict_thread.start()
+        thread = threading.Thread(target = pipeline.start_predicting, args=(model,))
+        thread.name = thread_id
+        thread.daemon = True
+        OperationManager.register_operation(pipeline.id, thread)
+        thread.start()
         
     
-    def terminate_operations(pipeline_id, thread_id):
+    def terminate_operations(pipeline_id, thread_list = None):
         global registry
         to_remove = list()
         pipeline = registry.get(pipeline_id)
         if pipeline != None:
-            if thread_id != None:
-                thread = pipeline.get(thread_id)
-                res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread.ident,  ctypes.py_object(SystemExit))
-                if res > 1:
-                    ctypes.pythonapi.PyThreadState_SetAsyncExc(thread.ident, 0)
-                else:
-                    to_remove.append(thread_id)
+            if thread_list != None:
+                for thread_id in thread_list:
+                    thread = pipeline.get(thread_id)
+                    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread.ident,  ctypes.py_object(SystemExit))
+                    if res > 1:
+                        ctypes.pythonapi.PyThreadState_SetAsyncExc(thread.ident, 0)
+                    else:
+                        to_remove.append(thread_id)
             else:
                 for thread_name in pipeline:
                     thread = pipeline.get(thread_name)
@@ -114,7 +119,3 @@ class OperationManager():
                     counter += 1
         
         return counter
-    
-    def deregister_pipeline(pipeline_id):
-        global registry
-        del registry[pipeline_id]

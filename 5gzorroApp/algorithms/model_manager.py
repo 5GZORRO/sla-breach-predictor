@@ -5,7 +5,6 @@ Created on Wed Dec 23 15:27:41 2020
 @author: dlaskaratos ICOM
 """
 
-from __future__ import annotations
 from algorithms.models import ModelEntity, BaseLSTM, BaseARIMA, UnivariateLSTM
 from keras.models import load_model
 from config.config import Config as cnf
@@ -50,7 +49,7 @@ class ModelManager():
         path = fm.create_path_if_not_exists(path+'/'+str(pipeline_id)+'/'+model_id)
         date = datetime.now().strftime("%d-%m-%Y_%H-%M")
         version = date
-        model_entity.get_model().save(path/version)
+        model_entity.model.save(path/version)
         md.register_model(pipeline_id, model_id, path, version, {'accuracy': 0})
             
         

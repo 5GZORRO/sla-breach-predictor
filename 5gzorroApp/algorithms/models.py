@@ -6,7 +6,6 @@ Created on Wed Dec 23 16:05:06 2020
 """
 
 
-from __future__ import annotations
 from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
@@ -31,10 +30,13 @@ class ModelEntity(ABC):
         self.threshold = 0
         self.metric = None
         self.accuracy = 0
+        self.prediction_counter = 0
         self.model_available = False
         self.new_model = False
         self.active_training = False
         self.active_prediction = False
+        self.prediction_list = []
+        self.value_list = []
         
     @abstractmethod
     def train(self):
@@ -49,7 +51,7 @@ class ModelEntity(ABC):
         pass
     
     @abstractmethod
-    def get_specification(params) -> ModelEntity:
+    def get_specification(params):
         pass
     
     def get_model(self):
@@ -118,14 +120,13 @@ class BaseLSTM(ModelEntity):
     
     
     def train(self, data):
-        # print("TRAINING STARTED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        # print('Data size: ', len(data))
-        # X, y = self.split_sequence(data, self.n_steps)
-        # X = X.reshape((X.shape[0], X.shape[1], self.n_features))
-        # self.model.fit(X, y, epochs=200, verbose=0)
-        # print("TRAINING ENDED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
         print("TRAINING STARTED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        print(len(data))
+        X, y = self.split_sequence(data, self.n_steps)
+        X = X.reshape((X.shape[0], X.shape[1], self.n_features))
+        self.model.fit(X, y, epochs=200, verbose=0)
+        print("TRAINING ENDED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+        # print("TRAINING STARTED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+        # print(len(data))
         # data_path = cnf.DATA
         # if fm.path_exists(data_path):
         #     data = pd.read_csv(data_path+"/"+'logfile.log')
@@ -138,7 +139,6 @@ class BaseLSTM(ModelEntity):
         # X, y = self.split_sequence(train, self.n_steps)
         # X = X.reshape((X.shape[0], X.shape[1], self.n_features))
         # self.model.fit(X, y, epochs=200, verbose=0)
-        print("TRAINING ENDED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
 
     
     # def predict(self):

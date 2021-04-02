@@ -1,4 +1,4 @@
-FROM sla-python
+FROM tensorflow-python
 
 # Copy the entire folder from host OS to container
 COPY . .

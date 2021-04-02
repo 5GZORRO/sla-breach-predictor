@@ -47,15 +47,6 @@ class Handler():
         pipeline = __active_ops.get(_id)
         return pipeline
     
-    # def get_or_create(data: ClientData):
-    #     global __active_ops
-    #     pipeline = __active_ops.get(data.unique_id)
-    #     if pipeline is None:
-    #         pipeline = ActivePipeline(data.unique_id, data.operations)
-    #         __active_ops[data.unique_id] = pipeline
-    #         om.register_pipeline(pipeline.id)
-    #     return pipeline
-    
     def start_pipeline(pipeline):
         threads_list = None
         try:
@@ -92,7 +83,7 @@ class Handler():
         result = None
         try:
             om.terminate_operations(pipeline_id, thread_id)
-            result = 'Termination was sucessful.'
+            result = 'Termination was successful.'
         except Exception as e:
             result = str(e)
             log.error(result)
@@ -121,23 +112,26 @@ class Handler():
                 model = pipeline.models.get(update['model_id'])
                 threshold = int(update['threshold'])
                 metric = update['metric']
-                if update_type == 'remove':
+                predict_thread_id = model.id+'-predict'
+                train_thread_id = model.id+'-train'
+                if update_type == 'add':
                     pass
+                elif update_type == 'remove':
+                    thread_list = [predict_thread_id, train_thread_id]
+                    Handler.terminate(pipeline.id, thread_list = thread_list, clean_up = False)
                 elif update_type == 'update':
                     if metric is not None: # Threads need to be restarted
-                        predict_thread_id = model.id+'-predict'
-                        train_thread_id = model.id+'-train'
                         model.active_prediction = False
-                        termination_result = Handler.terminate(pipeline.id, thread_id = predict_thread_id, clean_up = False)
-                        time.sleep(1) # wait one second to stop thread asynchronously before restarting
                         model.active_training = False
-                        termination_result = Handler.terminate(pipeline.id, thread_id = train_thread_id, clean_up = False)
-                        time.sleep(1) # wait one second to stop thread asynchronously before restarting
+                        thread_list = [predict_thread_id, train_thread_id]
+                        termination_result = Handler.terminate(pipeline.id, thread_list = thread_list, clean_up = False)
+                        time.sleep(1) # Wait for 1 second to stop the threads asynchronously
                         result = 'Terminated threads with status: '+termination_result
                         try:
                             model.metric = metric
                             model.threshold = threshold
-                            # om.start_operation_with_id(pipeline, model, thread_id)
+                            om.start_operation_with_id(pipeline, model, train_thread_id)
+                            om.start_operation_with_id(pipeline, model, predict_thread_id)
                             result = 'Sucessfully restarted prediction thread'
                         except Exception as e:
                             result = str(e)
