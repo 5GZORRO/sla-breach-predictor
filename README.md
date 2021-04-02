@@ -1,2 +1,2 @@
 # sla-breach-predictor
-SLA Breach Prediction module for 5GZorror
+SLA Breach Prediction module for 5GZorro
