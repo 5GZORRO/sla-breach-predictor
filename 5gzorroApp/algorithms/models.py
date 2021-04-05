@@ -24,19 +24,18 @@ from exceptions.exceptions import PathNotFoundException
 
 class ModelEntity(ABC):
     
+    global_accuracy = 0.99
+    
     def __init__(self):
         self.model = None
         self.id = None
         self.threshold = 0
         self.metric = None
         self.accuracy = 0
-        self.prediction_counter = 0
         self.model_available = False
         self.new_model = False
         self.active_training = False
         self.active_prediction = False
-        self.prediction_list = []
-        self.value_list = []
         
     @abstractmethod
     def train(self):

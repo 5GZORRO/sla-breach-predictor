@@ -24,8 +24,6 @@ class ActivePipeline():
         self.name = name
         self.description = description
         self.models = self.__extract_rules__(self.id, rules)
-        # self.train_consumer = None
-        # self.predict_consumer = None
         self.offset = 0
         
     
@@ -43,29 +41,30 @@ class ActivePipeline():
                      data = json.loads(dct)
                      metric = data[model_entity.metric]
                      dataset.append(float(metric))
-                     # model_entity.value_list.append([int(str(data['time'])[:-5]), metric])
                      if len(dataset) >= data_points:
-                     # try: 
-                        self.offset = message.offset
-                        model_entity.train(dataset[0:data_points])
-                        manager.save_model(self.id, model_entity)
-                        model_entity.new_model = True
-                        model_entity.model_available = True
-                        dataset = dataset[data_points:]
-                        log.info('Model successfully saved')
-                        time.sleep(cnf.TR_TMT)
-                     # except Exception as ex:
-                     #    result = "Error during model training or saving: " + str(ex)
-                     #    log.error(result)
-                     
+                         if model_entity.accuracy < model_entity.global_accuracy:
+                              # try: 
+                                 self.offset = message.offset
+                                 model_entity.train(dataset[0:data_points])
+                                 manager.save_model(self.id, model_entity)
+                                 model_entity.new_model = True
+                                 model_entity.model_available = True
+                                 dataset = dataset[data_points:]
+                                 log.info('Model successfully saved')
+                              # except Exception as ex:
+                              #     result = "Error during model training or saving: " + str(ex)
+                              #     log.error(result)
+                         time.sleep(cnf.TR_TMT)                     
                      
         
     def start_predicting(self, model_entity):
         consumer = Consumer()
         consumer.subscribe(cnf.MON_TOPIC)
+        prediction_counter = 0
+        accuracy = 0
         counter = 0
         model_entity.active_prediction = True
-        prediction_for_accuracy = 0
+        prediction_for_accuracy = -1
         
         while(not model_entity.model_available):
             counter += 1
@@ -87,12 +86,13 @@ class ActivePipeline():
                     data = json.loads(dct)
                     dates.append(data['time'])
                     metric = data[model_entity.metric]
-                    if metric is not None:
+                    if metric is not None: 
                         metrics.append(float(metric))
-                        if prediction_for_accuracy != 0:
-                            single_accuracy = self.get_single_prediction_accuracy(prediction_for_accuracy, float(metric))
-                            model_entity.accuracy += single_accuracy
-                            model_entity.prediction_counter += 1
+                        if prediction_for_accuracy > 0:
+                            accuracy += self.get_single_prediction_accuracy(prediction_for_accuracy, float(metric))
+                            prediction_counter += 1
+                            model_entity.accuracy = accuracy/prediction_counter
+                            # print('Global accuracy after prediction #', prediction_counter, ': ', model_entity.accuracy*100, '%')
                     else:
                         raise MetricNotFoundException(model_entity.metric)
                         # result_array = data.get('data').get('result')
@@ -110,7 +110,7 @@ class ActivePipeline():
                         #         raise MetricNotFoundException(model_entity.metric)
                     if len(metrics) == model_entity.n_steps:
                         
-                        if model_entity.new_model: 
+                        if model_entity.new_model:
                             load_result, saved_model = manager.load_model(self.id, model_entity.get_id())
                             if saved_model != None:
                                 model_entity.set_model(saved_model)
@@ -121,8 +121,6 @@ class ActivePipeline():
                         prediction = model_entity.predict(metrics)
                         prediction_for_accuracy = prediction
                         timestamp = str(dates[len(dates)-1])[:-5]
-                        entry = [int(timestamp), prediction]
-                        model_entity.prediction_list.append(entry)
                         timestamp = int(timestamp)+60
                         date = datetime.fromtimestamp(timestamp)
                         metrics.pop(0)
@@ -146,16 +144,6 @@ class ActivePipeline():
             result = 'Failed to update model: ', str(e)
         
         return result
-                
-           
-    def write_values_to_log(self, entity, _list, _round):
-        logs_path = cnf.LOGS
-        try:
-            file = open(logs_path+entity.get_id()+str(_round)+".log", "a+")
-            for line in _list:
-                file.write(str(line)+"\n")
-        except Exception as ex:
-            logging.error(str(ex))
         
     def __extract_rules__(self, pipeline_id, rules):
         models = {}
@@ -172,42 +160,4 @@ class ActivePipeline():
             accuracy = real_value/prediction_for_accuracy
                     
         return accuracy
-        
-    
-    def calculate_accuracy(self, model_entity):
-        
-        accuracy = None
-        count = 0
-        value_list = model_entity.value_list.copy()
-        prediction_list = model_entity.prediction_list.copy()
-        
-        if len(value_list) == 0 or len(prediction_list) == 0:
-            return 0
-        
-        for value_pair in value_list:
-            for pred_pair in prediction_list:
-                if value_pair[0] == pred_pair[0]:
-                    count += 1
-                    value = value_pair[1]
-                    prediction = pred_pair[1]
                     
-                    if value > prediction:
-                        acc = prediction/value
-                    else:
-                        acc = value/prediction
-                    
-                    accuracy += acc
-                    break
-        
-        return accuracy/count
-                    
-                    
-        
-        
-        
-        
-        
-
-
-
-
