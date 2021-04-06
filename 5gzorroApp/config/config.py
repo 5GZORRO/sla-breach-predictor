@@ -21,6 +21,7 @@ class Config():
     SAVE = None
     DATA = None
     TRAIN_DATA_POINTS = 0
+    POINTS_FOR_MEDIAN_ACCURACY = 0
     
     #KAFKA
     KAFKA_HOST = None
@@ -43,6 +44,7 @@ class Config():
         Config.SAVE = __conf['model']['save_path']
         Config.DATA = __conf['model']['data_path']
         Config.TRAIN_DATA_POINTS = int(__conf['model']['train_data_points'])
+        Config.POINTS_FOR_MEDIAN_ACCURACY = int(__conf['model']['points_for_median_accuracy'])
         
         Config.KAFKA_HOST = __conf['kafka']['host']
         Config.KAFKA_PORT = __conf['kafka']['port']

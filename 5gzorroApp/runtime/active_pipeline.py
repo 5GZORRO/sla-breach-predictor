@@ -13,7 +13,8 @@ import time
 import json
 from exceptions.exceptions import MetricNotFoundException
 from datetime import datetime
-import pandas as pd
+import statistics
+import threading
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class ActivePipeline():
         self.description = description
         self.models = self.__extract_rules__(self.id, rules)
         self.offset = 0
+        self.lock = threading.Lock()
         
     
     def start_training(self, model_entity):
@@ -33,38 +35,36 @@ class ActivePipeline():
         model_entity.active_training = True
         data_points = cnf.TRAIN_DATA_POINTS
         dataset = list()
-        
-        while(model_entity.active_training):
             
-                 for message in consumer.consumer:
-                     dct = message.value.decode('utf-8')
-                     data = json.loads(dct)
-                     metric = data[model_entity.metric]
-                     dataset.append(float(metric))
-                     if len(dataset) >= data_points:
-                         if model_entity.accuracy < model_entity.global_accuracy:
-                              # try: 
-                                 self.offset = message.offset
-                                 model_entity.train(dataset[0:data_points])
-                                 manager.save_model(self.id, model_entity)
-                                 model_entity.new_model = True
-                                 model_entity.model_available = True
-                                 dataset = dataset[data_points:]
-                                 log.info('Model successfully saved')
-                              # except Exception as ex:
-                              #     result = "Error during model training or saving: " + str(ex)
-                              #     log.error(result)
-                         time.sleep(cnf.TR_TMT)                     
+        for message in consumer.consumer:
+            dct = message.value.decode('utf-8')
+            data = json.loads(dct)
+            metric = data[model_entity.metric]
+            dataset.append(float(metric))
+            if len(dataset) >= data_points:
+                if model_entity.median_accuracy < model_entity.global_accuracy:
+                    try:
+                        self.offset = message.offset
+                        model_entity.train(dataset[0:data_points])
+                        with self.lock:
+                            manager.save_model(self.id, model_entity)
+                        model_entity.new_model = True
+                        model_entity.model_available = True
+                        dataset = dataset[data_points:]
+                        log.info('Model successfully saved')
+                    except Exception as ex:
+                        result = "Error during model training or saving: " + str(ex)
+                        log.error(result)
+                    time.sleep(cnf.TR_TMT)                     
                      
         
     def start_predicting(self, model_entity):
         consumer = Consumer()
         consumer.subscribe(cnf.MON_TOPIC)
-        prediction_counter = 0
-        accuracy = 0
         counter = 0
+        points_for_median_accuracy = cnf.POINTS_FOR_MEDIAN_ACCURACY
         model_entity.active_prediction = True
-        prediction_for_accuracy = -1
+        prediction_for_accuracy = 0
         
         while(not model_entity.model_available):
             counter += 1
@@ -73,63 +73,65 @@ class ActivePipeline():
         
         log.info('STARTING PREDICTION CYCLE')
         
-        metrics = list()
-        dates = list()
+        metrics = []
+        dates = []
+        accuracies = []
         
-        while(model_entity.active_prediction):
+        consumer.consumer.seek(consumer.partition, self.offset)
             
-            consumer.consumer.seek(consumer.partition, self.offset)
-            
-            try:
-                for message in consumer.consumer:
-                    dct = message.value.decode('utf-8')
-                    data = json.loads(dct)
-                    dates.append(data['time'])
-                    metric = data[model_entity.metric]
-                    if metric is not None: 
-                        metrics.append(float(metric))
-                        if prediction_for_accuracy > 0:
-                            accuracy += self.get_single_prediction_accuracy(prediction_for_accuracy, float(metric))
-                            prediction_counter += 1
-                            model_entity.accuracy = accuracy/prediction_counter
-                            # print('Global accuracy after prediction #', prediction_counter, ': ', model_entity.accuracy*100, '%')
-                    else:
-                        raise MetricNotFoundException(model_entity.metric)
-                        # result_array = data.get('data').get('result')
-                        # for item in result_array:
-                        #     metric = item.get('metric')
-                        #     if metric is not None:
-                        #         name = metric.get('__name__')
-                        #         if name != model_entity.metric:
-                        #             continue
-                        #         else:
-                        #             value = item.get('value')
-                        #             dates.append(value[0]) # timestamp
-                        #             metrics.append(float(value[1])) # metric value
-                        #     else:
-                        #         raise MetricNotFoundException(model_entity.metric)
-                    if len(metrics) == model_entity.n_steps:
+        try:
+            for message in consumer.consumer:
+                dct = message.value.decode('utf-8')
+                data = json.loads(dct)
+                dates.append(data['time'])
+                metric = data[model_entity.metric]
+                if metric is not None:
+                    metrics.append(float(metric))
+                    running_accuracy = self.get_single_prediction_accuracy(prediction_for_accuracy, float(metric))
+                    if running_accuracy > 0: # If either the metric or the prediction is 0, the 0 accuracy cannot be included in the list
+                        accuracies.append(running_accuracy)
+                        if len(accuracies) == points_for_median_accuracy: # Once the list contains the defined number of accuracies, 
+                                                                          # we can proceed to calculate the median
+                            model_entity.median_accuracy = statistics.median(accuracies)
+                            accuracies.pop(0) # Remove the first accuracy in the list in order to insert the one in the next iteration at the back
+                            print(model_entity.median_accuracy)
+                else:
+                    raise MetricNotFoundException(model_entity.metric)
+                    # result_array = data.get('data').get('result')
+                    # for item in result_array:
+                    #     metric = item.get('metric')
+                    #     if metric is not None:
+                    #         name = metric.get('__name__')
+                    #         if name != model_entity.metric:
+                    #             continue
+                    #         else:
+                    #             value = item.get('value')
+                    #             dates.append(value[0]) # timestamp
+                    #             metrics.append(float(value[1])) # metric value
+                    #     else:
+                    #         raise MetricNotFoundException(model_entity.metric)
+                if len(metrics) == model_entity.n_steps:
                         
-                        if model_entity.new_model:
-                            load_result, saved_model = manager.load_model(self.id, model_entity.get_id())
-                            if saved_model != None:
-                                model_entity.set_model(saved_model)
-                                model_entity.new_model = False
-                            else:
-                                log.error("Could not load new model. %s", load_result)
-                        
+                    if model_entity.new_model:
+                        load_result, saved_model = manager.load_model(self.id, model_entity.get_id())
+                        if saved_model != None:
+                            model_entity.set_model(saved_model)
+                            model_entity.new_model = False
+                        else:
+                            log.error("Could not load new model. %s", load_result)
+                    with self.lock:
                         prediction = model_entity.predict(metrics)
-                        prediction_for_accuracy = prediction
-                        timestamp = str(dates[len(dates)-1])[:-5]
-                        timestamp = int(timestamp)+60
-                        date = datetime.fromtimestamp(timestamp)
-                        metrics.pop(0)
-                        if prediction > model_entity.threshold:
-                            notification = 'Predicted violation of threshold '+str(model_entity.threshold)+' with value: '+str(prediction)+ ' at '+str(date)
-                            Producer.send(notification)
+                    prediction_for_accuracy = prediction
+                    timestamp = str(dates[len(dates)-1])[:-5]
+                    timestamp = int(timestamp)+60
+                    date = datetime.fromtimestamp(timestamp)
+                    metrics.pop(0)
+                    if prediction > model_entity.threshold:
+                        notification = 'Predicted violation of threshold '+str(model_entity.threshold)+' with value: '+str(prediction)+ ' at '+str(date)
+                        Producer.send(notification)
 
-            except Exception as e:
-                log.error('Error during prediction process: %s', str(e))
+        except Exception as e:
+            log.error('Error during prediction process: %s', str(e))
 
         
     def update_model(self, model_data):
@@ -154,10 +156,10 @@ class ActivePipeline():
     
     def get_single_prediction_accuracy(self, prediction_for_accuracy, real_value):
         accuracy = 0
-        if real_value > prediction_for_accuracy:
-            accuracy = prediction_for_accuracy/real_value
-        else:
+        if real_value < prediction_for_accuracy:
             accuracy = real_value/prediction_for_accuracy
+        else:
+            accuracy = prediction_for_accuracy/real_value
                     
         return accuracy
                     

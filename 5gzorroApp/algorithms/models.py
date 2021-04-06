@@ -9,7 +9,6 @@ Created on Wed Dec 23 16:05:06 2020
 from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
 from keras.models import Sequential
 from keras.layers import Bidirectional, LSTM, Dense
 import statsmodels.api as sm
@@ -19,7 +18,6 @@ from file.file_manager import FileManager as fm
 # import matplotlib.pyplot as plt
 # matplotlib.use('Agg')
 from datetime import datetime
-from exceptions.exceptions import PathNotFoundException
 
 
 class ModelEntity(ABC):
@@ -31,7 +29,7 @@ class ModelEntity(ABC):
         self.id = None
         self.threshold = 0
         self.metric = None
-        self.accuracy = 0
+        self.median_accuracy = 0
         self.model_available = False
         self.new_model = False
         self.active_training = False
@@ -117,28 +115,12 @@ class BaseLSTM(ModelEntity):
         print("This is ", self.algorithm_type, " with n_features: ", self.n_features)
         
     
-    
     def train(self, data):
         print("TRAINING STARTED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
         X, y = self.split_sequence(data, self.n_steps)
         X = X.reshape((X.shape[0], X.shape[1], self.n_features))
         self.model.fit(X, y, epochs=200, verbose=0)
         print("TRAINING ENDED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        # print("TRAINING STARTED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        # print(len(data))
-        # data_path = cnf.DATA
-        # if fm.path_exists(data_path):
-        #     data = pd.read_csv(data_path+"/"+'logfile.log')
-        # else:
-        #     raise PathNotFoundException(str(data_path))
-         
-        # server = "216.66.13.235:8088"
-        # srv = data.loc[data['server'] == server]
-        # train,test = self.extract_data(srv)
-        # X, y = self.split_sequence(train, self.n_steps)
-        # X = X.reshape((X.shape[0], X.shape[1], self.n_features))
-        # self.model.fit(X, y, epochs=200, verbose=0)
-
     
     # def predict(self):
     #     print("STARTED PREDICTION:  " , datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
