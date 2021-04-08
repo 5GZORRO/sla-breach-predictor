@@ -64,12 +64,12 @@ class OperationManager():
                 t.daemon = True
                 t.start()
     
-    def start_operation_with_id(pipeline, model, thread_id):
+    def start_operation_with_id(operation, pipeline_id, model, thread_id):
         global registry
-        thread = threading.Thread(target = pipeline.start_predicting, args=(model,))
+        thread = threading.Thread(target = operation, args=(model,))
         thread.name = thread_id
         thread.daemon = True
-        OperationManager.register_operation(pipeline.id, thread)
+        OperationManager.register_operation(pipeline_id, thread)
         thread.start()
         
     

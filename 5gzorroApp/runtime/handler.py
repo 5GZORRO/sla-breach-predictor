@@ -79,10 +79,10 @@ class Handler():
         global __active_ops
         del __active_ops[pipeline_id]
     
-    def terminate(pipeline_id, thread_id = None, clean_up = True):
+    def terminate(pipeline_id, thread_list = None, clean_up = True):
         result = None
         try:
-            om.terminate_operations(pipeline_id, thread_id)
+            om.terminate_operations(pipeline_id, thread_list)
             result = 'Termination was successful.'
         except Exception as e:
             result = str(e)
@@ -102,8 +102,8 @@ class Handler():
     
     def update_pipeline(data):
         global __active_ops
-        pipeline_id = data['id']
-        updates = data['updates']
+        pipeline_id = data.get('id')
+        updates = data.get('updates')
         pipeline = __active_ops.get(pipeline_id)
         result = None
         if pipeline != None: 
@@ -111,7 +111,7 @@ class Handler():
                 update_type = update['update_type']
                 model = pipeline.models.get(update['model_id'])
                 threshold = int(update['threshold'])
-                metric = update['metric']
+                metric = update.get('metric')
                 predict_thread_id = model.id+'-predict'
                 train_thread_id = model.id+'-train'
                 if update_type == 'add':
@@ -130,9 +130,9 @@ class Handler():
                         try:
                             model.metric = metric
                             model.threshold = threshold
-                            om.start_operation_with_id(pipeline, model, train_thread_id)
-                            om.start_operation_with_id(pipeline, model, predict_thread_id)
-                            result = 'Sucessfully restarted prediction thread'
+                            om.start_operation_with_id(pipeline.start_training, pipeline.id, model, train_thread_id)
+                            om.start_operation_with_id(pipeline.start_predicting, pipeline.id, model, predict_thread_id)
+                            result = 'Sucessfully restarted threads'
                         except Exception as e:
                             result = str(e)
                             log.error(result)
@@ -140,7 +140,7 @@ class Handler():
                         model.threshold = threshold
                         
         else:
-            result = "Pipeline "+"'"+pipeline_id+"' "+"does not exist."
+            result = "Pipeline "+"'"+str(pipeline_id)+"' "+"does not exist."
         
         return 'Update status: '+result
     

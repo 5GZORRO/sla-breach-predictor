@@ -18,7 +18,9 @@ from file.file_manager import FileManager as fm
 # import matplotlib.pyplot as plt
 # matplotlib.use('Agg')
 from datetime import datetime
+import logging
 
+log = logging.getLogger(__name__)
 
 class ModelEntity(ABC):
     
@@ -116,11 +118,11 @@ class BaseLSTM(ModelEntity):
         
     
     def train(self, data):
-        print("TRAINING STARTED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+        log.info("TRAINING STARTED:   ")#, str(datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
         X, y = self.split_sequence(data, self.n_steps)
         X = X.reshape((X.shape[0], X.shape[1], self.n_features))
         self.model.fit(X, y, epochs=200, verbose=0)
-        print("TRAINING ENDED:   ", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+        log.info("TRAINING ENDED:   ")#, str(datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
     
     # def predict(self):
     #     print("STARTED PREDICTION:  " , datetime.now().strftime("%d/%m/%Y %H:%M:%S"))

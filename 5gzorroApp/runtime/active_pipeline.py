@@ -34,7 +34,7 @@ class ActivePipeline():
         consumer.subscribe(cnf.MON_TOPIC)
         model_entity.active_training = True
         data_points = cnf.TRAIN_DATA_POINTS
-        dataset = list()
+        dataset = []
             
         for message in consumer.consumer:
             dct = message.value.decode('utf-8')
@@ -65,6 +65,9 @@ class ActivePipeline():
         points_for_median_accuracy = cnf.POINTS_FOR_MEDIAN_ACCURACY
         model_entity.active_prediction = True
         prediction_for_accuracy = 0
+        running_accuracy = 0
+        prediction_date = None
+        discard_pile = 0
         
         while(not model_entity.model_available):
             counter += 1
@@ -83,18 +86,25 @@ class ActivePipeline():
             for message in consumer.consumer:
                 dct = message.value.decode('utf-8')
                 data = json.loads(dct)
-                dates.append(data['time'])
+                date = data['time']
+                dates.append(date)
                 metric = data[model_entity.metric]
                 if metric is not None:
                     metrics.append(float(metric))
-                    running_accuracy = self.get_single_prediction_accuracy(prediction_for_accuracy, float(metric))
+                    
+                    if prediction_date is not None:
+                        date = datetime.fromtimestamp(int(str(date)[:-5])).strftime("%d/%m/%Y %H:%M")
+                        if prediction_date == date:
+                            running_accuracy = self.get_single_prediction_accuracy(prediction_for_accuracy, float(metric))
+                        else:
+                            running_accuracy = 0
+                    
                     if running_accuracy > 0: # If either the metric or the prediction is 0, the 0 accuracy cannot be included in the list
                         accuracies.append(running_accuracy)
                         if len(accuracies) == points_for_median_accuracy: # Once the list contains the defined number of accuracies, 
                                                                           # we can proceed to calculate the median
                             model_entity.median_accuracy = statistics.median(accuracies)
                             accuracies.pop(0) # Remove the first accuracy in the list in order to insert the one in the next iteration at the back
-                            print(model_entity.median_accuracy)
                 else:
                     raise MetricNotFoundException(model_entity.metric)
                     # result_array = data.get('data').get('result')
@@ -124,10 +134,10 @@ class ActivePipeline():
                     prediction_for_accuracy = prediction
                     timestamp = str(dates[len(dates)-1])[:-5]
                     timestamp = int(timestamp)+60
-                    date = datetime.fromtimestamp(timestamp)
+                    prediction_date = datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y %H:%M")
                     metrics.pop(0)
                     if prediction > model_entity.threshold:
-                        notification = 'Predicted violation of threshold '+str(model_entity.threshold)+' with value: '+str(prediction)+ ' at '+str(date)
+                        notification = 'Predicted violation of threshold '+str(model_entity.threshold)+' with value: '+str(prediction)+ ' at '+prediction_date
                         Producer.send(notification)
 
         except Exception as e:
