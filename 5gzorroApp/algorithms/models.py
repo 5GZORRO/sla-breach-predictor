@@ -104,7 +104,6 @@ class BaseLSTM(ModelEntity):
         self.model.compile(optimizer = self.optimizer, loss = self.loss)
         
         
-    
     def get_specification(model_data) -> ModelEntity:
         spec = model_data.get('spec')
         if spec == 'univariate':

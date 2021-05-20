@@ -108,9 +108,9 @@ class Handler():
         result = None
         if pipeline != None: 
             for update in updates:
-                update_type = update['update_type']
+                update_type = update.get('update_type')
                 model = pipeline.models.get(update['model_id'])
-                threshold = int(update['threshold'])
+                threshold = int(update.get('threshold'))
                 metric = update.get('metric')
                 predict_thread_id = model.id+'-predict'
                 train_thread_id = model.id+'-train'

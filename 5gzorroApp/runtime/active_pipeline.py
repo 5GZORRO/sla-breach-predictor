@@ -15,6 +15,8 @@ from exceptions.exceptions import MetricNotFoundException
 from datetime import datetime
 import statistics
 import threading
+import pandas as pd
+import numpy as np
 
 log = logging.getLogger(__name__)
 
@@ -35,7 +37,7 @@ class ActivePipeline():
         model_entity.active_training = True
         data_points = cnf.TRAIN_DATA_POINTS
         dataset = []
-            
+        
         for message in consumer.consumer:
             dct = message.value.decode('utf-8')
             data = json.loads(dct)
@@ -67,7 +69,6 @@ class ActivePipeline():
         prediction_for_accuracy = 0
         running_accuracy = 0
         prediction_date = None
-        discard_pile = 0
         
         while(not model_entity.model_available):
             counter += 1
@@ -88,16 +89,19 @@ class ActivePipeline():
                 data = json.loads(dct)
                 date = data['time']
                 dates.append(date)
-                metric = data[model_entity.metric]
+                metric = data.get(model_entity.metric)
                 if metric is not None:
-                    metrics.append(float(metric))
                     
+                    metrics.append(float(metric))
                     if prediction_date is not None:
                         date = datetime.fromtimestamp(int(str(date)[:-5])).strftime("%d/%m/%Y %H:%M")
                         if prediction_date == date:
                             running_accuracy = self.get_single_prediction_accuracy(prediction_for_accuracy, float(metric))
                         else:
                             running_accuracy = 0
+                            metrics.pop(0)
+                            metrics.insert(1, np.nan)
+                            metrics = pd.Series(metrics).interpolate().tolist()
                     
                     if running_accuracy > 0: # If either the metric or the prediction is 0, the 0 accuracy cannot be included in the list
                         accuracies.append(running_accuracy)
@@ -121,7 +125,7 @@ class ActivePipeline():
                     #     else:
                     #         raise MetricNotFoundException(model_entity.metric)
                 if len(metrics) == model_entity.n_steps:
-                        
+                    
                     if model_entity.new_model:
                         load_result, saved_model = manager.load_model(self.id, model_entity.get_id())
                         if saved_model != None:
