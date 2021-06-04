@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: isbp
+  labels:
+    app: isbp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: isbp
+  template:
+    metadata:
+      labels:
+        app: isbp
+    spec:
+      containers:
+      - image: dimitrislask/isbp:isbp-minimal
+        imagePullPolicy: Always
+        name: isbp
+        command: ["uvicorn", "sla-service:app", "--host", "0.0.0.0", "--port", "8000"]
+        ports:
+        - containerPort: 8000
+          name: isbp
+        volumeMounts:
+        - name: shared-test
+          mountPath: /isbp-data/
+      tolerations:
+      - key: "node-role.kubernetes.io/controlplane"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      - key: "node-role.kubernetes.io/etcd"
+        operator: "Equal"
+        value: "true"
+        effect: "NoExecute"
+      volumes:
+        - name: shared-test
+          persistentVolumeClaim:
+            claimName: isbp-claim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: isbp
+spec:
+  ports:
+  - port: 8000
+    targetPort: 8000
+  selector:
+    app: isbp

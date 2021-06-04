@@ -1,0 +1,48 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: isbp
+provisioner: kubernetes.io/no-provisioner
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: isbp-volume
+  labels:
+     vol: isbp-vol
+spec:
+  capacity:
+    storage: 100Mi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: isbp
+  local:
+    path: /mnt/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: "node-role.kubernetes.io/controlplane"
+          operator: "In"
+          values:
+          - "true"
+
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: isbp-claim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 100Mi
+  storageClassName: isbp
+  selector:
+    matchLabels:
+      vol: "isbp-vol"

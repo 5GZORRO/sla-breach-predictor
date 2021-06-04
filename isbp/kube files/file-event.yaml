@@ -1,0 +1,138 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: file
+  namespace: argo-events
+spec:
+  template:
+    container:
+      volumeMounts:
+        - mountPath: /isbp-data/
+          name: test-data
+    tolerations:
+    - key: "node-role.kubernetes.io/controlplane"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+    - key: "node-role.kubernetes.io/etcd"
+      operator: "Equal"
+      value: "true"
+      effect: "NoExecute"
+    volumes:
+      - name: test-data
+        persistentVolumeClaim:
+          claimName: isbp-claim
+  file:
+    predict:
+      watchPathConfig:
+        # directory to watch
+        directory: /isbp-data/
+        # path to watch
+        path: data.json
+      # type of the event
+      # supported types are: CREATE, WRITE, REMOVE, RENAME, CHMOD
+      eventType: CREATE
+    train:
+      watchPathConfig:
+        # directory to watch
+        directory: /isbp-data/
+        # path to watch
+        path: train.csv
+      # type of the event
+      # supported types are: CREATE, WRITE, REMOVE, RENAME, CHMOD
+      eventType: CREATE
+      
+---
+
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: file
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: predict-dep
+      eventSourceName: file
+      eventName: predict
+    - name: train-dep
+      eventSourceName: file
+      eventName: train
+  triggers:
+    - template:
+        conditions: "predict-dep"
+        name: predict-workflow-trigger
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: predict-watcher-
+              spec:
+                entrypoint: predict
+                templates:
+                - name: predict
+                  container:
+                    image: dimitrislask/isbp:predict
+                    imagePullPolicy: Always
+                    command: ["python", "predict.py"]
+                    volumeMounts:
+                    - name: shared-test
+                      mountPath: /isbp-data/
+                  tolerations:
+                  - key: "node-role.kubernetes.io/controlplane"
+                    operator: "Equal"
+                    value: "true"
+                    effect: "NoSchedule"
+                  - key: "node-role.kubernetes.io/etcd"
+                    operator: "Equal"
+                    value: "true"
+                    effect: "NoExecute"
+                  volumes:
+                    - name: shared-test
+                      persistentVolumeClaim:
+                        claimName: isbp-claim
+    - template:
+        conditions: "train-dep"
+        name: train-workflow-trigger
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: train-watcher-
+              spec:
+                entrypoint: train
+                templates:
+                - name: train
+                  container:
+                    image: dimitrislask/isbp:train
+                    imagePullPolicy: Always
+                    command: ["python", "train.py"]
+                    volumeMounts:
+                    - name: shared-test
+                      mountPath: /isbp-data/
+                  tolerations:
+                  - key: "node-role.kubernetes.io/controlplane"
+                    operator: "Equal"
+                    value: "true"
+                    effect: "NoSchedule"
+                  - key: "node-role.kubernetes.io/etcd"
+                    operator: "Equal"
+                    value: "true"
+                    effect: "NoExecute"
+                  volumes:
+                    - name: shared-test
+                      persistentVolumeClaim:
+                        claimName: isbp-claim
