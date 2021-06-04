@@ -5,6 +5,8 @@ This is a FastApi web service that receives the details of a SLA and starts a tr
 
 ### HOW TO DEPLOY
 
+In folder 'kube files' there is a file 'isbp.yaml'. Run it using 'kubectl -n [namespace_name] apply -f isbp.yaml'. This will create a deployment and alo a service to expose ISBP to the network as "isbp".
+
 ### REST API 
 
 | Method        | URL           | Use   |
