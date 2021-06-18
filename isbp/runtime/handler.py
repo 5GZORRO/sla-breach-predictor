@@ -11,6 +11,9 @@ constructing an ActivePipeline or modifiying an existing one.
 
 """
 
+from sklearn.preprocessing import MinMaxScaler
+import numpy as np
+import pandas as pd
 from runtime.active_pipeline import ActivePipeline
 import json
 import logging
@@ -20,6 +23,7 @@ log = logging.getLogger(__name__)
 
 class Handler():
     
+    scaler = None
     __active_ops = None
     __count = 0
     
@@ -29,6 +33,10 @@ class Handler():
          
         __active_ops = {}
         __count = 0
+    
+    def get_list():
+        global __active_ops
+        return __active_ops
     
     def create_new_pipeline(data):
         global __active_ops
@@ -41,16 +49,18 @@ class Handler():
             result = 'Pipeline is already operational.'
             status_code = 409
         else:
-             pipeline = ActivePipeline(data.get('id'), 
-                                  data.get('_name'), 
-                                  data.get('description'), 
-                                  data.get('features'), 
-                                  data.get('n_steps'), 
-                                  data.get('threshold'))
-             __active_ops[pipeline.id] = pipeline
-             __count = __count + 1
-             result = 'Pipeline successfully started.'
-             status_code = 200
+            transaction_id = data.get('transactionID')
+            product_id = data.get('productID')
+            resource_id = data.get('resourceID')
+            instance_id = data.get('instanceID')
+            pipeline = ActivePipeline(transaction_id, 
+                                  product_id,
+                                  resource_id,
+                                  instance_id)
+            __active_ops[pipeline.productID] = pipeline
+            __count = __count + 1
+            result = 'Pipeline successfully started.'
+            status_code = 200
         return result, status_code
     
     def get_active_pipeline(_id):
@@ -77,20 +87,20 @@ class Handler():
         
     def set_prediction(data):
         global __active_ops
-        pipeline_id = data.get('pipeline_id')
-        prediction = float(data.get('prediction'))
-        timestamp = data.get('timestamp')
+        pipeline_id = data.get('slaID')
+        prediction = float(data.get('value'))
+        timestamp = data.get('datetimeViolation')
         pipeline = Handler.get_active_pipeline(pipeline_id)
         if pipeline is not None:
             pipeline.prediction_for_accuracy = prediction
             pipeline.prediction_date = timestamp
             result = 'Successfully set prediction for ' + pipeline_id
+            prediction = Handler.transform(prediction)
         else:
             result = 'Pipeline not found.'
             
         return result, pipeline, prediction
                 
-    
     
     def get_active_list():
         global __active_ops
@@ -131,5 +141,28 @@ class Handler():
             status_code = 404
         
         return result, status_code
+    
+    def init_scaler():
+        global scaler
+        data = pd.read_csv('train.csv')
+        bw = data['bw'].to_numpy()
+        scaler = MinMaxScaler(feature_range=(0, 10))
+        bw = bw.reshape(-1, 1)
+        scaler.fit(bw)
         
-
+    def transform(data):
+        global scaler
+        data = np.array(data)
+        data = data.reshape(-1, 1)
+        data = scaler.transform(data)
+        data = 100-data
+        return round(data[0][0])
+    
+    def inverse_transform(data):
+        global scaler
+        data = np.array(data)
+        data = data.reshape(-1, 1)
+        data = scaler.inverse_transform(data)
+        return data[0][0]
+        
+        

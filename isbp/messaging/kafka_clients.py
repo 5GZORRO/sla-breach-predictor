@@ -15,6 +15,7 @@ import statistics
 from datetime import datetime
 import numpy as np
 import pandas as pd
+import http_connector
 
 log = logging.getLogger(__name__)
 
@@ -60,45 +61,50 @@ class Consumer():
         for message in consumer:
             dct = message.value.decode('utf-8')
             data = json.loads(dct)
-            if message.topic == 'sla':
-                Handler.create_new_pipeline(data)
-            else:
-                data = data.get('monitoringData')
-                pipeline_id = json.loads(dct).get('id')
-                metric = data.get('metricValue')
-                pipeline = Handler.get_active_pipeline(pipeline_id)
-                if pipeline is not None: # Assume that a trained model always exists
-                    pipeline.training_list.append(float(metric))
-                    pipeline.prediction_list.append(float(metric))
-                    date = data.get('timestamp')
-                    pipeline.dates.append(date)
-                    if pipeline.prediction_date is not None:
-                        new_date = datetime.fromtimestamp(int(str(date)[:-5])).strftime("%d/%m/%Y %H:%M")
-                        if pipeline.prediction_date == new_date:
-                            pipeline.running_accuracy = pipeline.get_single_prediction_accuracy(pipeline.prediction_for_accuracy, float(metric))
-                        else:
-                            pipeline.running_accuracy = 0
-                            pipeline.prediction_list.pop(0)
-                            pipeline.prediction_list.insert(1, np.nan)
-                            pipeline.prediction_list = pd.Series(pipeline.prediction_list).interpolate().tolist()
+            data = data.get('data')
+            if data.get('eventType') == 'new_SLA':
+                pipeline = Handler.create_new_pipeline(data)
+                log.info('Got sla')
+                # sla_data = http_connector.get_sla(pipeline.productID)
+               
                 
-                    if pipeline.running_accuracy > 0: # If either the metric or the prediction is 0, the 0 accuracy cannot be included in the list
-                        pipeline.accuracies.append(pipeline.running_accuracy)
-                        if len(pipeline.accuracies) == pipeline.points_for_median_accuracy: # Once the list contains the defined number of accuracies, 
-                                                                          # we can proceed to calculate the median
-                            pipeline.median_accuracy = statistics.median(pipeline.accuracies)
-                            log.info('Median accuacy is: {0}'.format(pipeline.median_accuracy))
-                            pipeline.accuracies.pop(0) # Remove the first accuracy in the list in order to insert the one in the next iteration at the back
-                    if len(pipeline.prediction_list) == pipeline.n_steps:
-                        dictionary = {'pipeline_id' : pipeline.id, 'timestamp' : date, 'data' : pipeline.prediction_list}
-                        with open(cnf.TEMP_FILE_PATH + 'data.json', 'w') as outfile:
-                            json.dump(dictionary, outfile)
-                            pipeline.prediction_list.pop(0)
+            # else:
+            #     data = data.get('monitoringData')
+            #     pipeline_id = json.loads(dct).get('id')
+            #     metric = data.get('metricValue')
+            #     pipeline = Handler.get_active_pipeline(pipeline_id)
+            #     if pipeline is not None: # Assume that a trained model always exists
+            #         pipeline.training_list.append(float(metric))
+            #         pipeline.prediction_list.append(float(metric))
+            #         date = data.get('timestamp')
+            #         pipeline.dates.append(date)
+            #         if pipeline.prediction_date is not None:
+            #             new_date = datetime.fromtimestamp(int(str(date)[:-5])).strftime("%d-%m-%YT%H:%M")
+            #             if pipeline.prediction_date == new_date:
+            #                 pipeline.running_accuracy = pipeline.get_single_prediction_accuracy(pipeline.prediction_for_accuracy, float(metric))
+            #             else:
+            #                 pipeline.running_accuracy = 0
+            #                 pipeline.prediction_list.pop(0)
+            #                 pipeline.prediction_list.insert(1, np.nan)
+            #                 pipeline.prediction_list = pd.Series(pipeline.prediction_list).interpolate().tolist()
+                
+            #         if pipeline.running_accuracy > 0: # If either the metric or the prediction is 0, the 0 accuracy cannot be included in the list
+            #             pipeline.accuracies.append(pipeline.running_accuracy)
+            #             if len(pipeline.accuracies) == pipeline.points_for_median_accuracy: # Once the list contains the defined number of accuracies, 
+            #                                                               # we can proceed to calculate the median
+            #                 pipeline.median_accuracy = statistics.median(pipeline.accuracies)
+            #                 log.info('Median accuacy is: {0}'.format(pipeline.median_accuracy))
+            #                 pipeline.accuracies.pop(0) # Remove the first accuracy in the list in order to insert the one in the next iteration at the back
+            #         if len(pipeline.prediction_list) == pipeline.n_steps:
+            #             dictionary = {'pipeline_id' : pipeline.id, 'timestamp' : date, 'data' : pipeline.prediction_list}
+            #             with open(cnf.TEMP_FILE_PATH + 'data.json', 'w') as outfile:
+            #                 json.dump(dictionary, outfile)
+            #                 pipeline.prediction_list.pop(0)
            
-                    if pipeline.median_accuracy < cnf.GLOBAL_ACCURACY:
-                        if len(pipeline.training_list) == cnf.TRAIN_DATA_POINTS:
-                            pd.DataFrame(pipeline.training_list).to_csv(cnf.TEMP_FILE_PATH + 'train.csv')
-                            pipeline.training_list = pipeline.training_list[cnf.TRAIN_DATA_POINTS:]
+            #         if pipeline.median_accuracy < cnf.GLOBAL_ACCURACY:
+            #             if len(pipeline.training_list) == cnf.TRAIN_DATA_POINTS:
+            #                 pd.DataFrame(pipeline.training_list).to_csv(cnf.TEMP_FILE_PATH + 'train.csv')
+            #                 pipeline.training_list = pipeline.training_list[cnf.TRAIN_DATA_POINTS:]
                         
                         
                     
@@ -122,14 +128,16 @@ class Consumer():
 class Producer():
     
     producer = None
+    topic = None
     
     def init():
         global producer
+        global topic
         result = None
         try:
             host = cnf.KAFKA_HOST
             port  = cnf.KAFKA_PORT
-            producer = KafkaProducer(bootstrap_servers = host + ':' + port)
+            producer = KafkaProducer(bootstrap_servers = host +':' +port)
             result = 'Producer successfully connected.'
         except NoBrokersAvailable as nba:
             result = 'Error while trying to connect Producer: ' + str(nba)
@@ -138,5 +146,9 @@ class Producer():
     
     def send(data):
         global producer
-        producer.send(cnf.BREACH_TOPIC, data.encode('utf-8'))
-            
+        global topic
+        producer.send('isbp-topic-out', data.encode('utf-8'))
+
+    
+    
+    

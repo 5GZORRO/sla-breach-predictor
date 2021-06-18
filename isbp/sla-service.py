@@ -10,17 +10,21 @@ from messaging.kafka_clients import Consumer, Producer
 from fastapi.responses import HTMLResponse
 from runtime.handler import Handler
 from config.config import Config
+from http_connector import poll
 import logging
 import threading
 from os import path
 import shutil
 import ctypes
 import json
+import pandas as pd
 
 app = FastAPI()
 consumer = None
 consumer_thread = None
-topic_list = ['test','sla']
+poll_thread = None
+topic_list = ['isbp-topic']
+data_counter = 0
 
 @app.on_event('startup')
 def on_startup():
@@ -28,29 +32,37 @@ def on_startup():
     global consumer
     global consumer_thread
     global topic_list
+    global poll_thread
     Config.load_configuration()
+    Handler.init()
+    Handler.init_scaler()
     producer_result = Producer.init()
     logging.info(producer_result)
-    Handler.init()
     consumer_result, consumer = Consumer.init()
     logging.info(consumer_result)
+    poll_thread = threading.Thread(target = poll)
+    poll_thread.start()
     if consumer is not None:
         Consumer.subscribe(topic_list)
         consumer_thread = threading.Thread(target = Consumer.start)
         consumer_thread.start()
-    copy_model()
+    # copy_model()
     logging.info('Starting ISBP service...')
 
 
 @app.on_event('shutdown')
 def on_shutdown():
     global consumer_thread
+    global poll_thread
     logging.info('Shutting down consumer...')
     result = Consumer.stop()
     logging.info(result)
     res = ctypes.pythonapi.PyThreadState_SetAsyncExc(consumer_thread.ident,  ctypes.py_object(SystemExit))
     if res > 1:
         ctypes.pythonapi.PyThreadState_SetAsyncExc(consumer_thread.ident, 0)
+    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(poll_thread.ident,  ctypes.py_object(SystemExit))
+    if res > 1:
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(poll_thread.ident, 0)
 
 @app.get('/')
 def read_root():
@@ -74,7 +86,7 @@ def read_root():
 </body>
 </html>
          """
-    write_to_file()
+    # write_to_file()
     return HTMLResponse(content = index, status_code = 200)
 
 def write_to_file():
@@ -114,9 +126,10 @@ async def set_prediction(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
     result, pipeline, prediction = Handler.set_prediction(data)
     if pipeline is not None:
-        if prediction > pipeline.threshold:
-            notification = {'uuid' : pipeline.id, 'resouceID' : 'test', 'value' : str(prediction), 'targetDate' : pipeline.prediction_date}
-            data = json.dumps(notification)
+        if prediction < pipeline.threshold:
+            data['value'] = prediction
+            data = {'breachPredictionNotification' : data}
+            data = json.dumps(data)
             Producer.send(data)
     return Response(result, media_type = Media.TEXT_PLAIN)
 
@@ -135,6 +148,44 @@ def force_reconnect():
     consumer_result, consumer = Consumer.init()
     producer_result = Producer.init()
     return Response(consumer_result+'\n'+producer_result, media_type = Media.TEXT_PLAIN)
+
+@app.get('/monitoringData')
+def get_monitoring_data():
+    global data_counter
+    value = None
+    timestamp = None
+    j = {"status": "success",
+         "data": {
+             "resultType": "matrix",
+             "result": [
+             {
+                "metric": {
+                    "__name__": "availability",
+                    "job": "prometheus",
+                    "instance": "http://5gzorro_osm.com"
+                },
+                "values": [
+                    [
+                        
+                    ]
+                ]
+            }
+        ]
+    }
+}
+    
+    data = pd.read_csv('dataset.csv')
+    item = data[data_counter : data_counter +1]
+    for index, row in item.iterrows():
+        value = row['availability-percent']
+        timestamp = row['unix-timestamp']
+    
+    l = [[timestamp, value]]
+    j['data']['result'][0]['values'] = l
+
+    data = json.dumps(j)
+    data_counter = data_counter + 1
+    return Response(data, media_type = Media.APP_JSON)
 
 
 class Media():

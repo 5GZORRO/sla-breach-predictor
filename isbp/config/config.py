@@ -26,6 +26,9 @@ class Config():
     # STORAGE
     TEMP_FILE_PATH = None
     
+    #HTTP
+    POLL_TIMEOUT = 0
+    
     
     def load_configuration():
         global __conf
@@ -43,4 +46,8 @@ class Config():
         Config.BREACH_TOPIC = __conf['kafka']['breach_topic']
         
         Config.TEMP_FILE_PATH = __conf['storage']['temp_file_path']
+        
+        Config.POLL_TIMEOUT = __conf['http']['poll_timeout']
+        
+        
         

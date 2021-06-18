@@ -9,10 +9,9 @@ from config.config import Config as cnf
 
 class ActivePipeline():
     
-    def __init__(self, _id, name, description, features, n_steps, threshold) -> None:
-        self.id = _id
-        self.name = name
-        self.description = description
+    def __init__(self, transactionID, productID, resourceID, instanceID) -> None:
+        self.name = 'Business SLA'
+        self.description = 'ServiceLevelAgreement'
         self.training_list = []
         self.prediction_list = []
         self.accuracies = []
@@ -22,9 +21,17 @@ class ActivePipeline():
         self.running_accuracy = 0
         self.median_accuracy = 0
         self.prediction_date = None
-        self.features = features
-        self.n_steps = n_steps
-        self.threshold = threshold
+        self.features = 1
+        self.n_steps = 3
+        self.threshold = 97 # to be changed
+        self.data_seq = 0
+        self.metric = 'availability' # to be changed
+        self.metricLink = 'http://www.provider.com/metrics/availability'
+        self.transactionID = transactionID
+        self.productID = productID
+        self.resourceID = resourceID
+        self.instanceID = instanceID
+        self.current_timestamp = None
     
     def get_single_prediction_accuracy(self, prediction_for_accuracy, real_value):
         accuracy = 0
