@@ -23,9 +23,9 @@ class ActivePipeline():
         self.prediction_date = None
         self.features = 1
         self.n_steps = 3
-        self.threshold = 97 # to be changed
+        self.threshold = 97
         self.data_seq = 0
-        self.metric = 'availability' # to be changed
+        self.metric = 'availability'
         self.metricLink = 'http://www.provider.com/metrics/availability'
         self.transactionID = transactionID
         self.productID = productID
