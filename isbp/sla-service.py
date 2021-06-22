@@ -175,6 +175,8 @@ def get_monitoring_data():
 }
     
     data = pd.read_csv('dataset.csv')
+    if data_counter + 1 > len(data)-1:
+        data_counter  = 0
     item = data[data_counter : data_counter +1]
     for index, row in item.iterrows():
         value = row['availability-percent']
