@@ -27,7 +27,7 @@ def poll():
             pipeline = pipelines.get(pID)
             r = requests.get(catalog_url+pipeline.productID, json={"userId": "isbp", "authToken" : "blah"})
             if r.status_code == 200:
-              logging.info('Successfully retrieved monitoring data for pipeline: {0}'.format(pipeline.productID))
+              # logging.info('Successfully retrieved monitoring data for pipeline: {0}'.format(pipeline.productID))
               data_list = json.loads(r.text)
               last_item = data_list[len(data_list)-1]
               if last_item.get('timestamp') != pipeline.current_timestamp:

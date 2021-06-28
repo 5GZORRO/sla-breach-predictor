@@ -64,7 +64,7 @@ class Consumer():
             data = data.get('data')
             if data.get('eventType') == 'new_SLA':
                 pipeline = Handler.create_new_pipeline(data)
-                log.info('Got sla')
+                log.info('New SLA event received')
                 # sla_data = http_connector.get_sla(pipeline.productID)
                
                 

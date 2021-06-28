@@ -43,11 +43,12 @@ class Handler():
         global __count
         result = None
         status_code = 0
-        pipeline_id = data.get('id')
+        pipeline_id = data.get('productID')
         pipeline = __active_ops.get(pipeline_id)
         if pipeline is not None:
             result = 'Pipeline is already operational.'
             status_code = 409
+            log.info('Pipeline exists')
         else:
             transaction_id = data.get('transactionID')
             product_id = data.get('productID')
@@ -61,6 +62,7 @@ class Handler():
             __count = __count + 1
             result = 'Pipeline successfully started.'
             status_code = 200
+            log.info('Created new pipeline with ID: {0}'.format(pipeline.productID))
         return result, status_code
     
     def get_active_pipeline(_id):
@@ -87,7 +89,7 @@ class Handler():
         
     def set_prediction(data):
         global __active_ops
-        pipeline_id = data.get('slaID')
+        pipeline_id = data.get('productID')
         prediction = float(data.get('value'))
         timestamp = data.get('datetimeViolation')
         pipeline = Handler.get_active_pipeline(pipeline_id)
@@ -115,14 +117,14 @@ class Handler():
         else:
             for entry in __active_ops:
                 pipeline = __active_ops.get(entry)                
-                json_object = {'id' : pipeline.id,
+                json_object = {'id' : pipeline.productID,
                             'name' : pipeline.name,
                             'description' : pipeline.description,
                            }
-                active_list[pipeline.id] = json_object
+                active_list[pipeline.productID] = json_object
         result = json.dumps(active_list)
         
-        return result
+        return __count
     
     def get_pipeline(pipeline_id):
         global __active_ops
@@ -131,7 +133,7 @@ class Handler():
         status_code = 0
         if pipeline is not None:
             result = {}
-            result['id'] = pipeline.id
+            result['id'] = pipeline.productID
             result['name'] = pipeline.name
             result['description'] = pipeline.description
             result = json.dumps(result)

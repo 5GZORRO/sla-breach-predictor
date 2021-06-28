@@ -141,7 +141,7 @@ def get_pipeline(pipeline_id: str):
 @app.get('/get-active-list')
 def get_active_predictions():
     result = Handler.get_active_list()
-    return Response(result, media_type = Media.APP_JSON)
+    return Response(str(result))
 
 @app.post('/service/reconnect')
 def force_reconnect():
