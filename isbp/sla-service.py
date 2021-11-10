@@ -10,21 +10,17 @@ from messaging.kafka_clients import Consumer, Producer
 from fastapi.responses import HTMLResponse
 from runtime.handler import Handler
 from config.config import Config
-from http_connector import poll
+from runtime.http_connectors import register_app
 import logging
 import threading
 from os import path
 import shutil
 import ctypes
 import json
-import pandas as pd
 
 app = FastAPI()
 consumer = None
 consumer_thread = None
-poll_thread = None
-topic_list = ['isbp-topic']
-data_counter = 0
 
 @app.on_event('startup')
 def on_startup():
@@ -32,21 +28,17 @@ def on_startup():
     global consumer
     global consumer_thread
     global topic_list
-    global poll_thread
     Config.load_configuration()
     Handler.init()
-    Handler.init_scaler()
+    register_app()
     producer_result = Producer.init()
     logging.info(producer_result)
     consumer_result, consumer = Consumer.init()
     logging.info(consumer_result)
-    poll_thread = threading.Thread(target = poll)
-    poll_thread.start()
     if consumer is not None:
-        Consumer.subscribe(topic_list)
+        Consumer.subscribe(Config.TOPICS)
         consumer_thread = threading.Thread(target = Consumer.start)
         consumer_thread.start()
-    # copy_model()
     logging.info('Starting ISBP service...')
 
 
@@ -60,9 +52,6 @@ def on_shutdown():
     res = ctypes.pythonapi.PyThreadState_SetAsyncExc(consumer_thread.ident,  ctypes.py_object(SystemExit))
     if res > 1:
         ctypes.pythonapi.PyThreadState_SetAsyncExc(consumer_thread.ident, 0)
-    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(poll_thread.ident,  ctypes.py_object(SystemExit))
-    if res > 1:
-        ctypes.pythonapi.PyThreadState_SetAsyncExc(poll_thread.ident, 0)
 
 @app.get('/')
 def read_root():
@@ -86,12 +75,13 @@ def read_root():
 </body>
 </html>
          """
-    # write_to_file()
+    write_to_file()
     return HTMLResponse(content = index, status_code = 200)
+
 
 def write_to_file():
     dictionary = {'pipeline_id' : 123, 'timestamp' : 1589676626361.0, 'data' : [1954.0929, 1954.0929, 1976.6895]}
-    with open('/isbp-data/data.json', 'w') as outfile:
+    with open('/data/data.json', 'w') as outfile:
         json.dump(dictionary, outfile)
 
 @app.post('/add-topic/{topic_name}')
@@ -104,7 +94,7 @@ def set_new_topic(topic_name: str):
 
 def copy_model():
     src = 'save/'
-    dest = '/isbp-data/saved/'
+    dest = '/data/saved/'
     
     if not path.exists(dest):
         shutil.copytree(src, dest) 
@@ -126,11 +116,9 @@ async def set_prediction(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
     result, pipeline, prediction = Handler.set_prediction(data)
     if pipeline is not None:
-        if prediction < pipeline.threshold:
-            data['value'] = prediction
-            data = {'breachPredictionNotification' : data}
-            data = json.dumps(data)
-            Producer.send(data)
+        if pipeline.check_violation(prediction):
+            notification = breach_notification(data, prediction)
+            Producer.send(notification)
     return Response(result, media_type = Media.TEXT_PLAIN)
 
 @app.get('/service/pipeline/{pipeline_id}')
@@ -149,45 +137,11 @@ def force_reconnect():
     producer_result = Producer.init()
     return Response(consumer_result+'\n'+producer_result, media_type = Media.TEXT_PLAIN)
 
-@app.get('/monitoringData')
-def get_monitoring_data():
-    global data_counter
-    value = None
-    timestamp = None
-    j = {"status": "success",
-         "data": {
-             "resultType": "matrix",
-             "result": [
-             {
-                "metric": {
-                    "__name__": "availability",
-                    "job": "prometheus",
-                    "instance": "http://5gzorro_osm.com"
-                },
-                "values": [
-                    [
-                        
-                    ]
-                ]
-            }
-        ]
-    }
-}
-    
-    data = pd.read_csv('dataset.csv')
-    if data_counter + 1 > len(data)-1:
-        data_counter  = 0
-    item = data[data_counter : data_counter +1]
-    for index, row in item.iterrows():
-        value = row['availability-percent']
-        timestamp = row['unix-timestamp']
-    
-    l = [[timestamp, value]]
-    j['data']['result'][0]['values'] = l
-
-    data = json.dumps(j)
-    data_counter = data_counter + 1
-    return Response(data, media_type = Media.APP_JSON)
+def breach_notification(data, prediction):
+    data['value'] = prediction
+    data = {'breachPredictionNotification' : data}
+    data = json.dumps(data)
+    return data
 
 
 class Media():

@@ -23,7 +23,7 @@ class ActivePipeline():
         self.prediction_date = None
         self.features = 1
         self.n_steps = 3
-        self.threshold = 97
+        self.threshold = 9
         self.data_seq = 0
         self.metric = 'availability'
         self.metricLink = 'http://www.provider.com/metrics/availability'
@@ -32,6 +32,8 @@ class ActivePipeline():
         self.resourceID = resourceID
         self.instanceID = instanceID
         self.current_timestamp = None
+        self.operator = 'gt'
+        
     
     def get_single_prediction_accuracy(self, prediction_for_accuracy, real_value):
         accuracy = 0
@@ -41,3 +43,20 @@ class ActivePipeline():
             accuracy = prediction_for_accuracy/real_value
                     
         return accuracy
+    
+    def check_violation(self, prediction):
+        if self.operator == 'gt':
+            if prediction > self.threshold:
+                return True
+            else:
+                return False
+        if self.operator == 'lt':
+            if prediction < self.threshold:
+               return True
+            else:
+               return False
+        if self.operator == 'eq':
+            if prediction == self.threshold:
+                return True
+            else:
+                return False

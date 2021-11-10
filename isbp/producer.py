@@ -4,11 +4,12 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import time
+import random
 
 producer = KafkaProducer(bootstrap_servers = '172.28.3.196:9092')
 
 data = pd.read_csv('dataset.csv')
-srv = data[0:3]
+srv = data[0:10]
 
 for index, row in srv.iterrows():
     timestamp = row['unix-timestamp']
@@ -17,7 +18,7 @@ for index, row in srv.iterrows():
             "resourceID": "isbp",
             "referenceID": "isbp",
             "transactionID": "tran1",
-            "productID": "isbp",
+            "productID": str(random.randint(1, 3)),
             "instanceID": "inst1",
             "metricName": "metric1",
             "metricValue": value,
@@ -33,4 +34,4 @@ for index, row in srv.iterrows():
     msg = json.dumps(postMonitoringDataDict) 
     producer.send('isbp-in-0', msg.encode('utf-8'))
     producer.flush()
-    time.sleep(40)
+    # time.sleep(40)

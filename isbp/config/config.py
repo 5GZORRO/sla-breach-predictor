@@ -19,15 +19,12 @@ class Config():
     # KAFKA
     KAFKA_HOST = None
     KAFKA_PORT = 0
-    KAFKA_POLL_TIMEOUT = 0
-    MON_TOPIC = None
+    TOPICS = ['isbp-topic']
     BREACH_TOPIC = None
+    MON_DATA_TOPIC = None
     
     # STORAGE
     TEMP_FILE_PATH = None
-    
-    #HTTP
-    POLL_TIMEOUT = 0
     
     
     def load_configuration():
@@ -41,13 +38,14 @@ class Config():
         
         Config.KAFKA_HOST = __conf['kafka']['host']
         Config.KAFKA_PORT = __conf['kafka']['port']
-        Config.KAFKA_POLL_TIMEOUT = int(__conf['kafka']['poll_timeout'])
-        Config.MON_TOPIC = __conf['kafka']['mon_topic']
+        mon_data_topic = __conf['kafka']['mon_topic']
+        if mon_data_topic != "":
+            Config.TOPICS.append(mon_data_topic)
+            Config.MON_DATA_TOPIC = mon_data_topic
+            
         Config.BREACH_TOPIC = __conf['kafka']['breach_topic']
         
         Config.TEMP_FILE_PATH = __conf['storage']['temp_file_path']
-        
-        Config.POLL_TIMEOUT = __conf['http']['poll_timeout']
         
         
         
