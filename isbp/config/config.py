@@ -11,7 +11,7 @@ class Config():
     
     __conf = None
     
-    # MODEL
+    # OPERATIONS
     GLOBAL_ACCURACY = 0
     TRAIN_DATA_POINTS = 0
     POINTS_FOR_MEDIAN_ACCURACY = 0
@@ -23,8 +23,9 @@ class Config():
     BREACH_TOPIC = None
     MON_DATA_TOPIC = None
     
-    # STORAGE
-    TEMP_FILE_PATH = None
+    # MODELS
+    LSTM = None
+    ARIMA = None
     
     
     def load_configuration():
@@ -32,9 +33,9 @@ class Config():
         __conf = ConfigParser()
         __conf.read('properties.conf')
         
-        Config.GLOBAL_ACCURACY = int(__conf['model']['global_accuracy'])
-        Config.TRAIN_DATA_POINTS = int(__conf['model']['train_data_points'])
-        Config.POINTS_FOR_MEDIAN_ACCURACY = int(__conf['model']['points_for_median_accuracy'])
+        Config.GLOBAL_ACCURACY = int(__conf['operations']['global_accuracy'])
+        Config.TRAIN_DATA_POINTS = int(__conf['operations']['train_data_points'])
+        Config.POINTS_FOR_MEDIAN_ACCURACY = int(__conf['operations']['points_for_median_accuracy'])
         
         Config.KAFKA_HOST = __conf['kafka']['host']
         Config.KAFKA_PORT = __conf['kafka']['port']
@@ -45,7 +46,8 @@ class Config():
             
         Config.BREACH_TOPIC = __conf['kafka']['breach_topic']
         
-        Config.TEMP_FILE_PATH = __conf['storage']['temp_file_path']
+        Config.LSTM = __conf['models']['LSTM']
+        Config.ARIMA = __conf['models']['ARIMA']
         
         
         
