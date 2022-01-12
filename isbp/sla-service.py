@@ -28,6 +28,7 @@ def on_startup():
     global consumer
     global consumer_thread
     global topic_list
+    copy_model()
     Config.load_configuration()
     Handler.init()
     register_app()
