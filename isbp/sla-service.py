@@ -92,6 +92,12 @@ def set_new_topic(topic_name: str):
     consumer.subscribe(topic_list)
     return Response('Topic received')
 
+@app.post('/service/sla')
+async def submit_slaID(request: Request):
+    data = await request.json()
+    pipeline, status = Handler.create_new_pipeline(data)
+    return Response(content = status, media_type = Media.TEXT_PLAIN)
+
 def copy_model():
     src = 'save/'
     dest = '/data/saved/'

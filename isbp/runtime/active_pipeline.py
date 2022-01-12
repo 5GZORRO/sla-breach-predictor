@@ -9,9 +9,9 @@ from config.config import Config as cnf
 
 class ActivePipeline():
     
-    def __init__(self, transactionID, productID, resourceID, instanceID) -> None:
-        self.name = 'Business SLA'
-        self.description = 'ServiceLevelAgreement'
+    def __init__(self, slaID, threshold, metric_name, operator) -> None:
+        self.name = None
+        self.description = None
         self.training_list = []
         self.prediction_list = []
         self.accuracies = []
@@ -23,16 +23,12 @@ class ActivePipeline():
         self.prediction_date = None
         self.features = 1
         self.n_steps = 3
-        self.threshold = 9
-        self.data_seq = 0
-        self.metric = 'availability'
+        self.threshold = threshold
+        self.metric = metric_name
         self.metricLink = 'http://www.provider.com/metrics/availability'
-        self.transactionID = transactionID
-        self.productID = productID
-        self.resourceID = resourceID
-        self.instanceID = instanceID
+        self.slaID = slaID
         self.current_timestamp = None
-        self.operator = 'gt'
+        self.operator = operator
         
     
     def get_single_prediction_accuracy(self, prediction_for_accuracy, real_value):
@@ -55,7 +51,7 @@ class ActivePipeline():
                return True
             else:
                return False
-        if self.operator == 'eq':
+        if self.operator == '.e':
             if prediction == self.threshold:
                 return True
             else:

@@ -14,7 +14,7 @@ import json
 import statistics
 from datetime import datetime
 import numpy as np
-
+import pandas as pd
 
 log = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class Consumer():
                     pipeline = Handler.create_new_pipeline(data)
             else:
                 data = data.get('monitoringData')
-                pipeline_id = data.get('productID')
+                pipeline_id = data.get('slaID')
                 metric = data.get('metricValue')
                 # log.info(data)
                 pipeline = Handler.get_active_pipeline(pipeline_id)

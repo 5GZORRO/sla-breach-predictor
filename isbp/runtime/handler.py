@@ -39,27 +39,27 @@ class Handler():
     def create_new_pipeline(data):
         global __active_ops
         global __count
-        pipeline_id = data.get('productID')
-        pipeline = __active_ops.get(pipeline_id)
+        slaID = data.get('slaID')
+        pipeline = __active_ops.get(slaID)
         if pipeline is not None:
-
-            log.info('Pipeline exists')
+            log.info('Pipeline already exists')
+            status = 'Pipeline already exists'
         else:
-            transaction_id = data.get('transactionID')
-            product_id = data.get('productID')
-            resource_id = data.get('resourceID')
-            instance_id = data.get('instanceID')
-            pipeline = ActivePipeline(transaction_id, 
-                                  product_id,
-                                  resource_id,
-                                  instance_id)
-            __active_ops[pipeline.productID] = pipeline
-            __count = __count + 1
-
-            log.info('Created new pipeline with ID: {0}'.format(pipeline.productID))
-            #get_sla_details()
-            register_pipeline(pipeline.productID)
-        return pipeline
+            try:
+                sla_details, status = get_sla_details(slaID)
+                if sla_details is not None:
+                    rule = sla_details.get('rule')[0]
+                    threshold = rule.get('referenceValue')
+                    operator = rule.get('operator')
+                    metric_name = rule.get('metric')
+                    pipeline = ActivePipeline(slaID, threshold, metric_name, operator)
+                    __active_ops[pipeline.slaID] = pipeline
+                    __count = __count + 1
+                    log.info('Created new pipeline with ID: {0}'.format(pipeline.slaID))
+                    register_pipeline(pipeline.slaID)
+            except Exception as e:
+                status = str(e)
+        return pipeline, status
     
     def get_active_pipeline(_id):
         global __active_ops
@@ -85,7 +85,7 @@ class Handler():
         
     def set_prediction(data):
         global __active_ops
-        pipeline_id = data.get('productID')
+        pipeline_id = data.get('slaID')
         prediction = float(data.get('value'))
         timestamp = data.get('datetimeViolation')
         pipeline = Handler.get_active_pipeline(pipeline_id)
@@ -113,7 +113,7 @@ class Handler():
         else:
             for entry in __active_ops:
                 pipeline = __active_ops.get(entry)                
-                json_object = {'id' : pipeline.productID,
+                json_object = {'id' : pipeline.slaID,
                             'name' : pipeline.name,
                             'description' : pipeline.description,
                            }
@@ -129,7 +129,7 @@ class Handler():
         status_code = 0
         if pipeline is not None:
             result = {}
-            result['id'] = pipeline.productID
+            result['id'] = pipeline.slaID
             result['name'] = pipeline.name
             result['description'] = pipeline.description
             result = json.dumps(result)
