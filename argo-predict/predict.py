@@ -11,12 +11,33 @@ import numpy as np
 import json
 from datetime import datetime
 import requests
+from zipfile import ZipFile
 
 print('Loading model..')
 
-model = load_model('/data/saved/lstm')
-f = open('/data/data.json',)
+f = open('/data/data.json','r')
 data = json.load(f)
+metric = data.get('metric')
+model = data.get('model')
+
+if not path.exists(model):
+    from minio import Minio
+    try:
+            client = Minio(
+                "isbpminio:9000",
+                access_key="isbp",
+                secret_key="isbpminio",
+                secure=False
+                )
+            client.fget_object("models", model+'.zip', '/data/saved/'+model+'.zip')
+            with ZipFile(model+'.zip', 'r') as _zip:
+                _zip.extractall('/data/saved/'+model)
+            print('Extraction complete')
+    except Exception as e:
+        client = None
+        print('Failed to connect to MinIO: ' + str(e))
+
+model = load_model('/data/saved/' + model)
 timestamp = data.get('timestamp')
 x_input = data.get('data')
 f.close()
@@ -25,6 +46,7 @@ inp = X.reshape((X.shape[0], X.shape[1], 1))
 yhat = model.predict(inp, verbose=0)
 prediction = yhat[0][0]
 operation_timestamp = datetime.now().strftime("%d-%m-%YT%H:%M")
+print('Prediction at '+ datetime.now().strftime("%d-%m-%YT%H:%M")+': '+ str(prediction))
 os.remove('/data/data.json')
 if not path.exists('/data/data.json'):
     print('File successfully removed')

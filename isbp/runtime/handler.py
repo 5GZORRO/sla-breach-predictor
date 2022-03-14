@@ -13,24 +13,31 @@ constructing an ActivePipeline or modifiying an existing one.
 
 from runtime.active_pipeline import ActivePipeline
 from runtime.http_connectors import register_pipeline, get_sla_details
+from runtime.model_registry import Model, ModelRegistry
+from minio import Minio
+from minio.error import S3Error
 import json
 import logging
+from configparser import ConfigParser
 
 log = logging.getLogger(__name__)
 
 
 class Handler():
     
-    scaler = None
     __active_ops = None
+    __parser = None
     __count = 0
     
     def init():
         global __active_ops
         global __count
+        global __parser
          
         __active_ops = {}
         __count = 0
+        __parser = ConfigParser()
+        Handler.__registry_init__()
     
     def get_list():
         global __active_ops
@@ -39,27 +46,32 @@ class Handler():
     def create_new_pipeline(data):
         global __active_ops
         global __count
-        slaID = data.get('slaID')
-        pipeline = __active_ops.get(slaID)
+        transactionID = data.get('transactionID')
+        productID = data.get('productID')
+        instanceID = data.get('instanceID')
+        location = data.get('place')
+        pipeline = __active_ops.get(transactionID)
         if pipeline is not None:
             log.info('Pipeline already exists')
             status = 'Pipeline already exists'
         else:
             try:
-                sla_details, status = get_sla_details(slaID)
+                sla_details, status = get_sla_details(productID)
                 if sla_details is not None:
                     rule = sla_details.get('rule')[0]
-                    threshold = rule.get('referenceValue')
+                    threshold = float(rule.get('referenceValue'))
                     operator = rule.get('operator')
                     metric_name = rule.get('metric')
-                    pipeline = ActivePipeline(slaID, threshold, metric_name, operator)
-                    __active_ops[pipeline.slaID] = pipeline
+                    pipeline = ActivePipeline(transactionID, instanceID, productID, threshold, metric_name, operator, location)
+                    __active_ops[pipeline.transactionID] = pipeline
                     __count = __count + 1
-                    log.info('Created new pipeline with ID: {0}'.format(pipeline.slaID))
-                    register_pipeline(pipeline.slaID)
+                    log.info('Created new pipeline with transactionID: {0}'.format(pipeline.transactionID))
+                    register_pipeline(pipeline.transactionID)
+                else:
+                    log.info('SLA with transactionID {0} could not be retrieved'.format(transactionID))    
             except Exception as e:
-                status = str(e)
-        return pipeline, status
+                log.info('Error: {0}'.format(str(e)))
+        return pipeline
     
     def get_active_pipeline(_id):
         global __active_ops
@@ -85,7 +97,7 @@ class Handler():
         
     def set_prediction(data):
         global __active_ops
-        pipeline_id = data.get('slaID')
+        pipeline_id = data.get('transactionID')
         prediction = float(data.get('value'))
         timestamp = data.get('datetimeViolation')
         pipeline = Handler.get_active_pipeline(pipeline_id)
@@ -113,11 +125,11 @@ class Handler():
         else:
             for entry in __active_ops:
                 pipeline = __active_ops.get(entry)                
-                json_object = {'id' : pipeline.slaID,
+                json_object = {'id' : pipeline.transactionID,
                             'name' : pipeline.name,
                             'description' : pipeline.description,
                            }
-                active_list[pipeline.productID] = json_object
+                active_list[pipeline.transactionID] = json_object
         result = json.dumps(active_list)
         
         return __count
@@ -129,7 +141,7 @@ class Handler():
         status_code = 0
         if pipeline is not None:
             result = {}
-            result['id'] = pipeline.slaID
+            result['id'] = pipeline.transactionID
             result['name'] = pipeline.name
             result['description'] = pipeline.description
             result = json.dumps(result)
@@ -139,4 +151,78 @@ class Handler():
             status_code = 404
         
         return result, status_code
-
+    
+    def register_model(data):
+        key = data.get('Records')[0].get('s3').get('object').get('key')
+        model_id = key.split('.')[0]
+        if key is not None:
+            try:
+                client = Handler.__minio_connect__()
+            except Exception as e:
+                log.error('{0}'.format(str(e))) 
+            if client is not None:
+                response = client.get_object('models', key)
+                content = response.data.decode('utf-8')
+                model = Handler.__parse_file__(content)
+                model._id = model_id
+                ModelRegistry.register_model(model)
+        else:
+            log.error('Failed to retrieve MinIO key')
+    
+    def deregister_model(data):
+        key = data.get('Records')[0].get('s3').get('object').get('key')
+        if key is not None:
+            model_id = key.split('.')[0]
+            ModelRegistry.deregister_model(model_id)
+    
+    def __registry_init__():
+        
+        log.info('Initializing model registry...')
+        ModelRegistry.init()
+        client = Handler.__minio_connect__()
+        if client is not None:
+            try:
+                found = client.bucket_exists("models")
+                if not found:
+                    log.info('MINIO ERROR: Bucket not found.')
+                else:
+                    files = client.list_objects('models')
+                    for file in files:
+                        if file.object_name.endswith('.config'):
+                            model_id = file.object_name.split('.')[0]
+                            response = client.get_object('models', file.object_name)
+                            content = response.data.decode('utf-8')
+                            model = Handler.__parse_file__(content)
+                            model._id = model_id
+                            ModelRegistry.register_model(model)
+            except Exception as e:
+                log.error('{0}'.format(str(e)))
+            
+        
+    
+    def __minio_connect__():
+        
+        client = None
+        
+        try:
+            client = Minio(
+                "isbpminio:9000",
+                access_key="isbp",
+                secret_key="isbpminio",
+                secure=False
+                )
+        except Exception as e:
+                client = None
+                log.error('Failed to connect to MinIO: {0}'.format(str(e)))
+        
+        return client
+    
+    def __parse_file__(content):
+        global __parser
+        __parser.read_string(content)
+        model_name = __parser['data']['name']
+        model_metric = __parser['data']['metric']
+        model_class = __parser['data']['class']
+        model = Model(model_name, model_metric, model_class)
+        return model
+        

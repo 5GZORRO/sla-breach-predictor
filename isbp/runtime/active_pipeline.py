@@ -9,7 +9,7 @@ from config.config import Config as cnf
 
 class ActivePipeline():
     
-    def __init__(self, slaID, threshold, metric_name, operator) -> None:
+    def __init__(self, transactionID, instanceID, productID, threshold, metric_name, operator, location) -> None:
         self.name = None
         self.description = None
         self.training_list = []
@@ -26,10 +26,22 @@ class ActivePipeline():
         self.threshold = threshold
         self.metric = metric_name
         self.metricLink = 'http://www.provider.com/metrics/availability'
-        self.slaID = slaID
+        self.transactionID = transactionID
+        self.productID = productID
+        self.instanceID = instanceID
         self.current_timestamp = None
         self.operator = operator
-        
+        self.location = location
+        self.__waiting_on_ack = False
+        self.model = 'lstm'
+    
+    @property
+    def waiting_on_ack(self):
+        return self.__waiting_on_ack
+    
+    @waiting_on_ack.setter
+    def waiting_on_ack(self, value):
+        self.__waiting_on_ack = value
     
     def get_single_prediction_accuracy(self, prediction_for_accuracy, real_value):
         accuracy = 0

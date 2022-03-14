@@ -5,37 +5,45 @@ import requests
 import json
 import logging
 
+log = logging.getLogger(__name__)
 params = {'userId' : 'isbp', 'authToken' : 'blah'}
 
 def register_app():
 
     global params
     register_url = 'http://172.28.3.94:8080/datalake/v1/user'
+    status = None
     
-    request = requests.post(register_url, json = params)
-    if request.status_code == 409:
-        logging.info('App already registered.Getting information.')
-        request = requests.get(register_url, json = params)
-        
-    response = json.loads(request.text)
-    data_topic = response.get('availableResources').get('topics').get('userInTopic')
-    kafka_url = response.get('availableResources').get('urls').get('kafka_url').split(':')
-    cnf.TOPICS.append(data_topic)
-    cnf.KAFKA_HOST = kafka_url[0]
-    cnf.KAFKA_PORT = kafka_url[1]
-    cnf.MON_DATA_TOPIC = data_topic
+    try:
+        request = requests.post(register_url, json = params)
+        if request.status_code == 409:
+            log.info('App already registered.Getting information.')
+            request = requests.get(register_url, json = params)
+        response = json.loads(request.text)
+        data_topic = response.get('availableResources').get('topics').get('userInTopic')
+        kafka_url = response.get('availableResources').get('urls').get('kafka_url').split(':')
+        cnf.TOPICS.append(data_topic)
+        cnf.KAFKA_HOST = kafka_url[0]
+        cnf.KAFKA_PORT = kafka_url[1]
+        cnf.MON_DATA_TOPIC = data_topic
+        status = request.status_code
+    except Exception as e:
+        log.error(str(e))
+        status = -1
+    
+    return status
     
 
-def register_pipeline(slaID):
+def register_pipeline(transactionID):
     global params
-    register_url = 'http://172.28.3.46:30887/datalake/v1/stream_data/register/'+slaID
+    register_url = 'http://172.28.3.46:30887/datalake/v1/stream_data/register/'+transactionID
     
     token = {'userInfo' : params, 'productInfo' : {'topic' : cnf.MON_DATA_TOPIC}}
     request = requests.post(register_url, json = token)
     if request.status_code > 200 and request.status_code < 300:
-        logging.info("Successfully registered pipeline with ID: {0}".format(slaID))
+        log.info("Successfully registered pipeline with Product ID: {0}".format(transactionID))
     else:
-        logging.info("Registration failed.")
+        log.info("Registration failed.")
         
     
 
@@ -43,7 +51,7 @@ def get_sla_details(slaID):
     sla_url = 'http://172.28.3.6:31080/smart-contract-lifecycle-manager/api/v1/service-level-agreement/'
     response = None
     request = requests.get(sla_url+slaID)
-    logging.info('SLA status: {0}'.format(request.status_code))
+    log.info('SLA status: {0}'.format(request.status_code))
     if request.status_code == 200:
         response = json.loads(request.text)
         result = 'SLA details successfully retrieved'

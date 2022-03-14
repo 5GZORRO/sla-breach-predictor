@@ -23,10 +23,8 @@ class Config():
     BREACH_TOPIC = None
     MON_DATA_TOPIC = None
     
-    # MODELS
-    LSTM = None
-    ARIMA = None
-    
+    # FILES
+    TEMP_FILE_PATH = None
     
     def load_configuration():
         global __conf
@@ -46,8 +44,8 @@ class Config():
             
         Config.BREACH_TOPIC = __conf['kafka']['breach_topic']
         
-        Config.LSTM = __conf['models']['LSTM']
-        Config.ARIMA = __conf['models']['ARIMA']
+        Config.TEMP_FILE_PATH = __conf['files']['file_path']
+        
         
         
         

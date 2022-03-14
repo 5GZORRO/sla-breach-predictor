@@ -1,4 +1,4 @@
-FROM tensorflow-python
+FROM base-python
 
 # Copy the entire folder from host OS to container
 COPY . .

@@ -28,18 +28,19 @@ def on_startup():
     global consumer
     global consumer_thread
     global topic_list
-    copy_model()
+    # copy_model()
     Config.load_configuration()
     Handler.init()
-    register_app()
-    producer_result = Producer.init()
-    logging.info(producer_result)
-    consumer_result, consumer = Consumer.init()
-    logging.info(consumer_result)
-    if consumer is not None:
-        Consumer.subscribe(Config.TOPICS)
-        consumer_thread = threading.Thread(target = Consumer.start)
-        consumer_thread.start()
+    status = register_app()
+    if status > 0:
+        producer_result = Producer.init()
+        logging.info(producer_result)
+        consumer_result, consumer = Consumer.init()
+        logging.info(consumer_result)
+        if consumer is not None:
+            Consumer.subscribe(Config.TOPICS)
+            consumer_thread = threading.Thread(target = Consumer.start)
+            consumer_thread.start()
     logging.info('Starting ISBP service...')
 
 
@@ -76,7 +77,7 @@ def read_root():
 </body>
 </html>
          """
-    write_to_file()
+    # write_to_file()
     return HTMLResponse(content = index, status_code = 200)
 
 
@@ -123,15 +124,28 @@ async def set_prediction(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
     result, pipeline, prediction = Handler.set_prediction(data)
     if pipeline is not None:
-        if pipeline.check_violation(prediction):
+        if pipeline.check_violation(float(prediction)):
             notification = breach_notification(data, prediction)
             Producer.send(notification)
+            pipeline.waiting_on_ack = True
     return Response(result, media_type = Media.TEXT_PLAIN)
 
 @app.get('/service/pipeline/{pipeline_id}')
 def get_pipeline(pipeline_id: str):
     result, code = Handler.get_pipeline(pipeline_id)
     return Response(status_code = code, content = result, media_type = Media.APP_JSON)
+
+@app.post('/minio-events/put')
+async def minio_put(request: Request):
+    data = await request.json()
+    result = Handler.register_model(data)
+    return Response(content = result)
+
+@app.post('/minio-events/delete')
+async def minio_delete(request: Request):
+    data = await request.json()
+    result = Handler.deregister_model(data)
+    return Response(content = result)
 
 @app.get('/get-active-list')
 def get_active_predictions():
