@@ -11,7 +11,8 @@ params = {'userId' : 'isbp', 'authToken' : 'blah'}
 def register_app():
 
     global params
-    register_url = 'http://172.28.3.94:8080/datalake/v1/user'
+    datalake_ip = cnf.DATALAKE
+    register_url = 'http://'+datalake_ip+'/datalake/v1/user'
     status = None
     
     try:
@@ -26,9 +27,10 @@ def register_app():
         cnf.KAFKA_HOST = kafka_url[0]
         cnf.KAFKA_PORT = kafka_url[1]
         cnf.MON_DATA_TOPIC = data_topic
+        cnf.DATALAKE_STREAM = response.get('availableResources').get('urls').get('dl_stream_data_server_url')
         status = request.status_code
     except Exception as e:
-        log.error(str(e))
+        log.error(e)
         status = -1
     
     return status
@@ -36,7 +38,8 @@ def register_app():
 
 def register_pipeline(transactionID):
     global params
-    register_url = 'http://172.28.3.46:30887/datalake/v1/stream_data/register/'+transactionID
+    stream_url = cnf.DATALAKE_STREAM
+    register_url = 'http://'+stream_url+'/datalake/v1/stream_data/register/'+transactionID
     
     token = {'userInfo' : params, 'productInfo' : {'topic' : cnf.MON_DATA_TOPIC}}
     request = requests.post(register_url, json = token)
@@ -48,7 +51,8 @@ def register_pipeline(transactionID):
     
 
 def get_sla_details(slaID):
-    sla_url = 'http://172.28.3.6:31080/smart-contract-lifecycle-manager/api/v1/service-level-agreement/'
+    lcm_ip = cnf.LCM
+    sla_url = 'http://'+lcm_ip+'/smart-contract-lifecycle-manager/api/v1/service-level-agreement/'
     response = None
     request = requests.get(sla_url+slaID)
     log.info('SLA status: {0}'.format(request.status_code))

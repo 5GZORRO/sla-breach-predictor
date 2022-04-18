@@ -28,7 +28,6 @@ def on_startup():
     global consumer
     global consumer_thread
     global topic_list
-    # copy_model()
     Config.load_configuration()
     Handler.init()
     status = register_app()
@@ -105,8 +104,21 @@ def copy_model():
     dest = '/data/saved/'
     
     if not path.exists(dest):
-        shutil.copytree(src, dest) 
+        shutil.copytree(src, dest)
 
+@app.post('/service/donwload-model')
+async def set_download_model(request: Request):
+    data = await request.json()
+    model_id = data.get('id')
+    Handler.set_model_download(model_id)
+    return Response(content = 'Set successful', media_type = Media.TEXT_PLAIN)
+
+@app.get('/service/consumer-health')
+def check_consumer_health():
+    check = consumer_thread.is_alive()
+    status = {"isAlive" : check}
+    data = json.dumps(status)
+    return Response(content = data, media_type = Media.APP_JSON)
 
 @app.post('/service/start')
 async def start_pipeline(request: Request):
@@ -149,8 +161,10 @@ async def minio_delete(request: Request):
 
 @app.get('/get-active-list')
 def get_active_predictions():
-    result = Handler.get_active_list()
-    return Response(str(result))
+    result, count = Handler.get_active_list()
+    response = {"count": count, "result": result}
+    response = json.dumps(response)
+    return Response(content = response, media_type = Media.APP_JSON)
 
 @app.post('/service/reconnect')
 def force_reconnect():

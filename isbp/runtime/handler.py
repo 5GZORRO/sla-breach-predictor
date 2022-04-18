@@ -11,7 +11,7 @@ constructing an ActivePipeline or modifiying an existing one.
 
 """
 
-from runtime.active_pipeline import ActivePipeline
+from runtime.active_pipeline import ActivePipeline, Status
 from runtime.http_connectors import register_pipeline, get_sla_details
 from runtime.model_registry import Model, ModelRegistry
 from minio import Minio
@@ -49,28 +49,31 @@ class Handler():
         transactionID = data.get('transactionID')
         productID = data.get('productID')
         instanceID = data.get('instanceID')
+        slaID = data.get('SLAID')
         location = data.get('place')
+        model_id = data.get('model')
+        model = ModelRegistry.get(model_id)
         pipeline = __active_ops.get(transactionID)
         if pipeline is not None:
             log.info('Pipeline already exists')
             status = 'Pipeline already exists'
         else:
             try:
-                sla_details, status = get_sla_details(productID)
+                sla_details, status = get_sla_details(slaID)
                 if sla_details is not None:
                     rule = sla_details.get('rule')[0]
-                    threshold = float(rule.get('referenceValue'))
+                    threshold = float(rule.get('tolerance'))
                     operator = rule.get('operator')
                     metric_name = rule.get('metric')
-                    pipeline = ActivePipeline(transactionID, instanceID, productID, threshold, metric_name, operator, location)
+                    pipeline = ActivePipeline(transactionID, instanceID, productID, slaID, threshold, metric_name, operator, location, model)
                     __active_ops[pipeline.transactionID] = pipeline
                     __count = __count + 1
                     log.info('Created new pipeline with transactionID: {0}'.format(pipeline.transactionID))
-                    register_pipeline(pipeline.transactionID)
+                    register_pipeline(pipeline.productID)
                 else:
-                    log.info('SLA with transactionID {0} could not be retrieved'.format(transactionID))    
+                    log.info('SLA with transactionID {0} and SLAID {1} could not be retrieved'.format(transactionID, slaID))    
             except Exception as e:
-                log.info('Error: {0}'.format(str(e)))
+                log.info('Error: {0}'.format(e))
         return pipeline
     
     def get_active_pipeline(_id):
@@ -118,21 +121,26 @@ class Handler():
         result = None
 
         # Initialize an empty list
-        active_list = {}
+        active_list = []
         
         if __count < 1:
             result = 'No active pipelines.'
         else:
-            for entry in __active_ops:
-                pipeline = __active_ops.get(entry)                
-                json_object = {'id' : pipeline.transactionID,
-                            'name' : pipeline.name,
-                            'description' : pipeline.description,
-                           }
-                active_list[pipeline.transactionID] = json_object
+            for (key, value) in __active_ops.items():
+                if value.status == Status.Active:
+                    json_object = {'transactionID' : value.transactionID,
+                            'productID' : value.productID,
+                            'instanceID' : value.instanceID,
+                            'metric': value.metric,
+                            'threshold': value.threshold,
+                            'operator': value.operator,
+                            'location': value.location,
+                            'model': value.model
+                            }
+                    active_list.append(json_object)
         result = json.dumps(active_list)
         
-        return __count
+        return result, __count
     
     def get_pipeline(pipeline_id):
         global __active_ops
@@ -175,6 +183,10 @@ class Handler():
             model_id = key.split('.')[0]
             ModelRegistry.deregister_model(model_id)
     
+    def set_model_download(_id):
+        model = ModelRegistry.get(_id)
+        model.download = True
+    
     def __registry_init__():
         
         log.info('Initializing model registry...')
@@ -196,7 +208,7 @@ class Handler():
                             model._id = model_id
                             ModelRegistry.register_model(model)
             except Exception as e:
-                log.error('{0}'.format(str(e)))
+                log.error('{0}'.format(e))
             
         
     
@@ -213,7 +225,7 @@ class Handler():
                 )
         except Exception as e:
                 client = None
-                log.error('Failed to connect to MinIO: {0}'.format(str(e)))
+                log.error('Failed to connect to MinIO: {0}'.format(e))
         
         return client
     

@@ -6,10 +6,11 @@ Created on Thu Dec 24 14:29:41 2020
 """
 
 from config.config import Config as cnf
+from enum import Enum
 
 class ActivePipeline():
     
-    def __init__(self, transactionID, instanceID, productID, threshold, metric_name, operator, location) -> None:
+    def __init__(self, transactionID, instanceID, productID, slaID, threshold, metric_name, operator, location, model) -> None:
         self.name = None
         self.description = None
         self.training_list = []
@@ -29,11 +30,21 @@ class ActivePipeline():
         self.transactionID = transactionID
         self.productID = productID
         self.instanceID = instanceID
+        self.slaID = slaID
         self.current_timestamp = None
         self.operator = operator
         self.location = location
         self.__waiting_on_ack = False
-        self.model = 'lstm'
+        self.model = model
+        self.__status = Status.ACTIVE
+    
+    @property
+    def status(self):
+        return self.__status
+    
+    @status.setter
+    def status(self, value: int):
+        self.__status = Status(value)
     
     @property
     def waiting_on_ack(self):
@@ -68,3 +79,9 @@ class ActivePipeline():
                 return True
             else:
                 return False
+
+class Status(Enum):
+    
+    ACTIVE = 1
+    TERMINATED = 2
+    INACTIVE = 3

@@ -2,25 +2,34 @@
 """
 Created on Tue May 11 15:03:47 2021
 
-@author: dlaskaratos
+@author: dlaskaratos Intracom Telecom
 """
 import os
 from os import path
-from keras.models import load_model
 import numpy as np
 import json
 from datetime import datetime
 import requests
 from zipfile import ZipFile
 
+
 print('Loading model..')
 
 f = open('/data/data.json','r')
 data = json.load(f)
-metric = data.get('metric')
-model = data.get('model')
+model_id = data.get('model_id')
+lib = data.get('lib')
+download = data.get('download')
+timestamp = data.get('timestamp')
+x_input = data.get('data')
+f.close()
+path_to_model = '/data/saved/'+model_id
+zip_model = path_to_model + '/' + model_id+'.zip'
 
-if not path.exists(model):
+if not path.exists(path_to_model):
+    os.mkdir(path_to_model)
+
+if download:
     from minio import Minio
     try:
             client = Minio(
@@ -29,22 +38,32 @@ if not path.exists(model):
                 secret_key="isbpminio",
                 secure=False
                 )
-            client.fget_object("models", model+'.zip', '/data/saved/'+model+'.zip')
-            with ZipFile(model+'.zip', 'r') as _zip:
-                _zip.extractall('/data/saved/'+model)
+            client.fget_object("models", model_id+'.zip', zip_model)
+            with ZipFile(zip_model, 'r') as _zip:
+                _zip.extractall(path_to_model)
             print('Extraction complete')
+            os.remove(zip_model)
     except Exception as e:
         client = None
-        print('Failed to connect to MinIO: ' + str(e))
+        print('Error: ', e)
 
-model = load_model('/data/saved/' + model)
-timestamp = data.get('timestamp')
-x_input = data.get('data')
-f.close()
-X = np.array([x_input])
-inp = X.reshape((X.shape[0], X.shape[1], 1))
-yhat = model.predict(inp, verbose=0)
-prediction = yhat[0][0]
+
+if lib == 'keras':
+    from keras.models import load_model
+    model = load_model(path_to_model)
+    X = np.array([x_input])
+    inp = X.reshape((X.shape[0], X.shape[1], 1))
+    yhat = model.predict(inp, verbose=0)
+    prediction = yhat[0][0]
+elif lib == 'sklearn':
+    from sklearn.svm import SVR
+    from joblib import load
+    model = load(path_to_model+'/'+model_id+'.joblib')
+    X = np.array([x_input])
+    inp = X = X.reshape((X.shape[0], X.shape[1]))
+    yhat = model.predict(inp)
+    prediction= yhat[0]
+
 operation_timestamp = datetime.now().strftime("%d-%m-%YT%H:%M")
 print('Prediction at '+ datetime.now().strftime("%d-%m-%YT%H:%M")+': '+ str(prediction))
 os.remove('/data/data.json')

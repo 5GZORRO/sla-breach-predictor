@@ -12,9 +12,10 @@ class Config():
     __conf = None
     
     # OPERATIONS
-    GLOBAL_ACCURACY = 0
     TRAIN_DATA_POINTS = 0
     POINTS_FOR_MEDIAN_ACCURACY = 0
+    GLOBAL_ACCURACY = 0
+    PREDICTIONS_MODEl_SELECTION = 0
     
     # KAFKA
     KAFKA_HOST = None
@@ -23,28 +24,34 @@ class Config():
     BREACH_TOPIC = None
     MON_DATA_TOPIC = None
     
-    # FILES
-    TEMP_FILE_PATH = None
+    #CONNECTORS
+    DATALAKE = None
+    DATALAKE_STREAM = None
+    LCM = None
     
     def load_configuration():
         global __conf
         __conf = ConfigParser()
         __conf.read('properties.conf')
+        operations = __conf['operations']
+        kafka = __conf['kafka']
+        connectors = __conf['connectors']
         
-        Config.GLOBAL_ACCURACY = int(__conf['operations']['global_accuracy'])
-        Config.TRAIN_DATA_POINTS = int(__conf['operations']['train_data_points'])
-        Config.POINTS_FOR_MEDIAN_ACCURACY = int(__conf['operations']['points_for_median_accuracy'])
+        Config.TRAIN_DATA_POINTS = int(operations['train_data_points'])
+        Config.POINTS_FOR_MEDIAN_ACCURACY = int(operations['points_for_median_accuracy'])
+        Config.GLOBAL_ACCURACY = int(operations['global_accuracy'])
+        Config.PREDICTIONS_MODEl_SELECTION = int(operations['predictions_model_selection'])
         
-        Config.KAFKA_HOST = __conf['kafka']['host']
-        Config.KAFKA_PORT = __conf['kafka']['port']
-        mon_data_topic = __conf['kafka']['mon_topic']
+        Config.KAFKA_HOST = kafka['host']
+        Config.KAFKA_PORT = int(kafka['port'])
+        mon_data_topic = kafka['mon_topic']
         if mon_data_topic != "":
             Config.TOPICS.append(mon_data_topic)
-            Config.MON_DATA_TOPIC = mon_data_topic
-            
-        Config.BREACH_TOPIC = __conf['kafka']['breach_topic']
+            Config.MON_DATA_TOPIC = mon_data_topic  
+        Config.BREACH_TOPIC = kafka['breach_topic']
         
-        Config.TEMP_FILE_PATH = __conf['files']['file_path']
+        Config.DATALAKE = connectors['datalake']
+        Config.LCM = connectors['lcm']
         
         
         

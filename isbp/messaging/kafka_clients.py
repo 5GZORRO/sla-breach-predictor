@@ -58,24 +58,25 @@ class Consumer():
         global consumer
         log.info('New consumer thread started')
         for message in consumer:
-            dct = message.value.decode('utf-8')
-            data = json.loads(dct)
-            if message.topic == 'isbp-topic':
-                transactionID = data.get('transactionID')
-                if data.get('eventType') == 'new_SLA':
-                    log.info('Received new SLA event with transaction ID: {0}'.format(transactionID))
-                    pipeline = Handler.create_new_pipeline(data)
-                elif data.get('eventType') == 'new_SLA_ACK':
-                    log.info('Received instantiation acknowledgement with transaction ID: {0}'.format(transactionID))
-                    pipeline = Handler.get_active_pipeline(transactionID)
-                    pipeline.waiting_on_ack = False
-            else:
-                data = data.get('monitoringData')
-                pipeline_id = data.get('transactionID')
-                metric = data.get('metricValue')
-                log.info(data)
-                pipeline = Handler.get_active_pipeline(pipeline_id)
-                if pipeline is not None:
+            try:
+                dct = message.value.decode('utf-8')
+                data = json.loads(dct)
+                if message.topic == 'isbp-topic':
+                    transactionID = data.get('transactionID')
+                    if data.get('eventType') == 'new_SLA':
+                        log.info('Received new SLA event with transaction ID: {0}'.format(transactionID))
+                        pipeline = Handler.create_new_pipeline(data)
+                    elif data.get('eventType') == 'new_SLA_ACK':
+                        log.info('Received instantiation acknowledgement with transaction ID: {0}'.format(transactionID))
+                        pipeline = Handler.get_active_pipeline(transactionID)
+                        pipeline.waiting_on_ack = False
+                else:
+                    data = data.get('monitoringData')
+                    pipeline_id = data.get('transactionID')
+                    metric = data.get('metricValue')
+                    log.info(data)
+                    pipeline = Handler.get_active_pipeline(pipeline_id)
+                    if pipeline is not None:
                         pipeline.training_list.append(float(metric))
                         if not pipeline.waiting_on_ack:
                             pipeline.prediction_list.append(float(metric))
@@ -102,25 +103,29 @@ class Consumer():
                             dictionary = {'transactionID': pipeline.transactionID,
                                           'instanceID' : pipeline.instanceID,
                                           'productID' : pipeline.productID,
-                                          'metric': pipeline.metric,
-                                          'model' : pipeline.model,
+                                          'model_id' : pipeline.model._id,
+                                          'lib' : pipeline.model.lib,
+                                          'donwload' : pipeline.model.download,
                                           'timestamp' : date,
                                           'data' : pipeline.prediction_list,
                                           'place' : pipeline.location}
                             with open(cnf.TEMP_FILE_PATH + 'data.json', 'w') as outfile:
                                 json.dump(dictionary, outfile)
                             pipeline.prediction_list.pop(0)
+                            pipeline.model.download = False
            
                     # if pipeline.median_accuracy < cnf.GLOBAL_ACCURACY:
-                    #     if len(pipeline.training_list) == cnf.TRAIN_DATA_POINTS:
-                    #         dictionary = {'metric': pipeline.metric}    
-                    #         with open(cnf.TEMP_FILE_PATH + 'metric.json', 'w') as outfile:
-                    #             json.dump(dictionary, outfile)
-                    #         pd.DataFrame(pipeline.training_list).to_csv(cnf.TEMP_FILE_PATH + 'train.csv')
-                    #         pipeline.training_list = pipeline.training_list[cnf.TRAIN_DATA_POINTS:]
+                        if len(pipeline.training_list) == cnf.TRAIN_DATA_POINTS:
+                            dictionary = {'lib' : pipeline.model.lib,
+                                          'model_id' : pipeline.model._id}    
+                            with open(cnf.TEMP_FILE_PATH + 'metric.json', 'w') as outfile:
+                                json.dump(dictionary, outfile)
+                            pd.DataFrame(pipeline.training_list).to_csv(cnf.TEMP_FILE_PATH + 'train.csv')
+                            pipeline.training_list = pipeline.training_list[cnf.TRAIN_DATA_POINTS:]
                         else:
                             log.info('Monitoring data discarded from prediction list')
-                        
+            except Exception as e:
+                log.error(e)
                     
     def transform(plist, features):
         X = np.array([plist])
@@ -151,6 +156,7 @@ class Producer():
         try:
             host = cnf.KAFKA_HOST
             port  = cnf.KAFKA_PORT
+            topic = cnf.BREACH_TOPIC
             producer = KafkaProducer(bootstrap_servers = host +':' +port)
             result = 'Producer successfully connected.'
         except NoBrokersAvailable as nba:
@@ -161,7 +167,7 @@ class Producer():
     def send(data):
         global producer
         global topic
-        producer.send('isbp-topic-out', data.encode('utf-8'))
+        producer.send(topic, data.encode('utf-8'))
 
     
     
