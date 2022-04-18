@@ -7,8 +7,12 @@ spec:
   template:
     container:
       volumeMounts:
-        - mountPath: /isbp-data/
-          name: test-data
+        - mountPath: /data/
+          name: shared-test
+    volumes:
+      - name: shared-test
+        persistentVolumeClaim:
+          claimName: isbp-claim
     tolerations:
     - key: "node-role.kubernetes.io/controlplane"
       operator: "Equal"
@@ -18,15 +22,11 @@ spec:
       operator: "Equal"
       value: "true"
       effect: "NoExecute"
-    volumes:
-      - name: test-data
-        persistentVolumeClaim:
-          claimName: isbp-claim
   file:
     predict:
       watchPathConfig:
         # directory to watch
-        directory: /isbp-data/
+        directory: /data/
         # path to watch
         path: data.json
       # type of the event
@@ -35,7 +35,7 @@ spec:
     train:
       watchPathConfig:
         # directory to watch
-        directory: /isbp-data/
+        directory: /data/
         # path to watch
         path: train.csv
       # type of the event
@@ -84,20 +84,13 @@ spec:
                     command: ["python", "predict.py"]
                     volumeMounts:
                     - name: shared-test
-                      mountPath: /isbp-data/
-                  tolerations:
-                  - key: "node-role.kubernetes.io/controlplane"
-                    operator: "Equal"
-                    value: "true"
-                    effect: "NoSchedule"
-                  - key: "node-role.kubernetes.io/etcd"
-                    operator: "Equal"
-                    value: "true"
-                    effect: "NoExecute"
+                      mountPath: /data/
                   volumes:
                     - name: shared-test
                       persistentVolumeClaim:
                         claimName: isbp-claim
+              
+                  
     - template:
         conditions: "train-dep"
         name: train-workflow-trigger
@@ -121,18 +114,10 @@ spec:
                     imagePullPolicy: Always
                     command: ["python", "train.py"]
                     volumeMounts:
-                    - name: shared-test
-                      mountPath: /isbp-data/
-                  tolerations:
-                  - key: "node-role.kubernetes.io/controlplane"
-                    operator: "Equal"
-                    value: "true"
-                    effect: "NoSchedule"
-                  - key: "node-role.kubernetes.io/etcd"
-                    operator: "Equal"
-                    value: "true"
-                    effect: "NoExecute"
+                    - name: test-data
+                      mountPath: /data/
                   volumes:
-                    - name: shared-test
+                    - name: test-data
                       persistentVolumeClaim:
                         claimName: isbp-claim
+                  

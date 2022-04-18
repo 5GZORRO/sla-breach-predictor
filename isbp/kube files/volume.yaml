@@ -19,16 +19,8 @@ spec:
   - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   storageClassName: isbp
-  local:
-    path: /mnt/
-  nodeAffinity:
-    required:
-      nodeSelectorTerms:
-      - matchExpressions:
-        - key: "node-role.kubernetes.io/controlplane"
-          operator: "In"
-          values:
-          - "true"
+  hostPath:
+    path: /Users/dlaskaratos/Desktop/data
 
 ---
 kind: PersistentVolumeClaim

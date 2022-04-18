@@ -15,16 +15,20 @@ spec:
         app: isbp
     spec:
       containers:
-      - image: dimitrislask/isbp:isbp-minimal
+      - name: isbp
+        image: dimitrislask/isbp:isbp
         imagePullPolicy: Always
-        name: isbp
         command: ["uvicorn", "sla-service:app", "--host", "0.0.0.0", "--port", "8000"]
         ports:
         - containerPort: 8000
           name: isbp
         volumeMounts:
         - name: shared-test
-          mountPath: /isbp-data/
+          mountPath: /data/
+      volumes:
+        - name: shared-test
+          persistentVolumeClaim:
+            claimName: isbp-claim
       tolerations:
       - key: "node-role.kubernetes.io/controlplane"
         operator: "Equal"
@@ -34,10 +38,58 @@ spec:
         operator: "Equal"
         value: "true"
         effect: "NoExecute"
-      volumes:
-        - name: shared-test
-          persistentVolumeClaim:
-            claimName: isbp-claim
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: isbp-minio
+  labels:
+    app: isbp-minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: isbp-minio
+  template:
+    metadata:
+      labels:
+        app: isbp-minio
+    spec:
+      containers:
+      - name: isbp-minio
+        command:
+        - minio
+        - server
+        - /data
+        env:
+        - name: MINIO_ROOT_USER
+          value: isbp
+        - name: MINIO_ROOT_PASSWORD
+          value: isbpminio
+        image: minio/minio
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - mkdir
+              - -p
+              - /data/models
+        ports:
+        - containerPort: 9000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: isbpminio
+spec:
+  ports:
+  - port: 9000
+    targetPort: 9000
+  selector:
+    app: isbp-minio
+  type: NodePort
+
 ---
 apiVersion: v1
 kind: Service
@@ -49,3 +101,5 @@ spec:
     targetPort: 8000
   selector:
     app: isbp
+  type: NodePort
+
