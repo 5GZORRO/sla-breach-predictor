@@ -51,8 +51,6 @@ class Handler():
         instanceID = data.get('instanceID')
         slaID = data.get('SLAID')
         location = data.get('place')
-        model_id = data.get('model')
-        model = ModelRegistry.get(model_id)
         pipeline = __active_ops.get(transactionID)
         if pipeline is not None:
             log.info('Pipeline already exists')
@@ -65,10 +63,11 @@ class Handler():
                     threshold = float(rule.get('tolerance'))
                     operator = rule.get('operator')
                     metric_name = rule.get('metric')
-                    pipeline = ActivePipeline(transactionID, instanceID, productID, slaID, threshold, metric_name, operator, location, model)
+                    model = ModelRegistry.get_model_by_metric(metric_name)
+                    pipeline = ActivePipeline(transactionID, instanceID, productID, slaID, threshold, metric_name, operator, model, location)
                     __active_ops[pipeline.transactionID] = pipeline
                     __count = __count + 1
-                    log.info('Created new pipeline with transactionID: {0}'.format(pipeline.transactionID))
+                    log.info('Created new pipeline with transactionID: {0} and model: {1}'.format(pipeline.transactionID, pipeline.model))
                     register_pipeline(pipeline.productID)
                 else:
                     log.info('SLA with transactionID {0} and SLAID {1} could not be retrieved'.format(transactionID, slaID))    
@@ -235,6 +234,7 @@ class Handler():
         model_name = __parser['data']['name']
         model_metric = __parser['data']['metric']
         model_class = __parser['data']['class']
-        model = Model(model_name, model_metric, model_class)
+        model_lib = __parser['data']['lib']
+        model = Model(model_name, model_metric, model_class, model_lib)
         return model
         

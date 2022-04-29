@@ -64,11 +64,22 @@ class ModelRegistry():
         global __registry
         return __registry.get(model_id)
     
+    def get_model_by_metric(metric_name):
+        global __registry
+        model = None
+        for key, value in __registry.items():
+            if value.metric == metric_name:
+                model = value._id
+                break
+        
+        return model
+        
+    
     def register_model(model: Model):
         global __registry
         
         try:
-            __registry[model._id] = {model}
+            __registry[model._id] = model
             log.info('Model {0} successuflly registered'.format(model.name))
         except Exception as e:
             log.error('Error registering model: {0}'.format(e))

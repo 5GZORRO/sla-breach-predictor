@@ -10,7 +10,7 @@ from enum import Enum
 
 class ActivePipeline():
     
-    def __init__(self, transactionID, instanceID, productID, slaID, threshold, metric_name, operator, location, model) -> None:
+    def __init__(self, transactionID, instanceID, productID, slaID, threshold, metric_name, operator, model, location) -> None:
         self.name = None
         self.description = None
         self.training_list = []
