@@ -7,9 +7,11 @@ This is a FastApi web service that receives the details of a SLA and starts a tr
 
 Assuming that argo and argo-events are installed in the kubernetes cluster.
 
-1) Create a persistentvolume and a persistentvolumeclaim using the volume.yaml file in 'kube files' folder. WARNING: tha yaml file creates the volume on a multi-node cluster, which is why path and nodeAffinity are taken into account. Make sure to change the values accordingly when deploying on your own cluster. Additionally, in order for every pod to successfully mount the volume, taints and tolerations must also be accounted for. For more information : https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/ .
-2) In folder 'kube files' there is a file 'isbp.yaml'. Run it using 'kubectl -n [namespace_name] apply -f isbp.yaml'. This will create a deployment and alo a service to expose ISBP to the network as "isbp".
-3) Lastly, you need to create the Argo resources needed for the workflows to function. file-event.yaml contains the sensor and eventSource. Make sure to create these resources in the same namespace as ISBP.
+1) In order for the app to function as intended, Argo Events must already be present in the cluster.
+2) Make sure to install all deployments in the namespace where you installed Argo Events. Be default the yaml files are installed in "argo-events" so if you have a different namespace, change it accordingly.
+3) Create a persistentvolume and a persistentvolumeclaim using the volume.yaml file in 'kube files' folder.
+4) Lastly, you need to create the Argo resources needed for the workflows to function. file-event.yaml contains the sensor and eventSource. Make sure to create these resources in the same namespace as ISBP.
+5) In folder 'kube files' there is a file 'isbp.yaml'. Run it using 'kubectl -n [namespace_name] apply -f isbp.yaml'. This will create an ISBP  deployment and alo a service to expose ISBP to the network as "isbp". Additionally, it will install a MinIO database with a pre-existing "models" bucket to hold zipped ML models. A service for MinIO will also be created.
 
 ### REST API 
 
