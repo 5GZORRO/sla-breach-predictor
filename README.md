@@ -5,7 +5,12 @@ This is a FastApi web service that receives the details of a SLA and starts a tr
 
 ![ISBP Architecture Components](https://github.com/5GZORRO/sla-breach-predictor/blob/main/ISBP.png?raw=true)
 
-### HOW TO DEPLOY
+## Prerequisites
+
+#### System Requirements
+
+* **Storage 100 MB**
+* **Kubernetes**
 
 Assuming that argo and argo-events are installed in the kubernetes cluster.
 
