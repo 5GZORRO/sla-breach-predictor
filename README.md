@@ -20,6 +20,14 @@ Assuming that argo and argo-events are installed in the kubernetes cluster.
 4) Lastly, you need to create the Argo resources needed for the workflows to function. file-event.yaml contains the sensor and eventSource. Make sure to create these resources in the same namespace as ISBP.
 5) In folder 'kube files' there is a file 'isbp.yaml'. Run it using 'kubectl -n [namespace_name] apply -f isbp.yaml'. This will create an ISBP  deployment and alo a service to expose ISBP to the network as "isbp". Additionally, it will install a MinIO database with a pre-existing "models" bucket to hold zipped ML models. A service for MinIO will also be created.
 
+### Software dependecies
+
+Argo Workflows & Events
+
+### 5GZORRO Module dependencies
+
+Data Lake
+
 ### REST API 
 
 | Method        | URL           | Use   |
