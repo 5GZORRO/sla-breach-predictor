@@ -1,6 +1,6 @@
-# sla-breach-predictor
-SLA Breach Prediction module for 5GZorro
+# Intelligent SLA Breach Predictor
 
+## Introductrion
 This is a FastApi web service that receives the details of a SLA and starts a training/prediction operation on the metric and threshold given in the parameters. On application startup, the app will try to connect to a Kafka broker specified in the configuration file properties.conf under the section [kafka]. If the connection fails, a new one can be established later using the REST API.
 
 ### HOW TO DEPLOY
