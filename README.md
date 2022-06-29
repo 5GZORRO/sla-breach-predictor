@@ -28,7 +28,7 @@ Assuming that argo and argo-events are installed in the kubernetes cluster.
 5) In folder 'kube files' there is a file 'isbp.yaml'. Run it using 'kubectl -n [namespace_name] apply -f isbp.yaml'. This will create an ISBP  deployment and alo a service to expose ISBP to the network as "isbp". Additionally, it will install a MinIO database with a pre-existing "models" bucket to hold zipped ML models. A service for MinIO will also be created.
 
 ### Docker installation
-No need
+N/A
 
 ## Configuration
 
