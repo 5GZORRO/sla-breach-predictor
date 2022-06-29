@@ -12,14 +12,6 @@ This is a FastApi web service that receives the details of a SLA and starts a tr
 * **Storage 100 MB**
 * **Kubernetes**
 
-Assuming that argo and argo-events are installed in the kubernetes cluster.
-
-1) In order for the app to function as intended, Argo Events must already be present in the cluster.
-2) Make sure to install all deployments in the namespace where you installed Argo Events. Be default the yaml files are installed in "argo-events" so if you have a different namespace, change it accordingly.
-3) Create a persistentvolume and a persistentvolumeclaim using the volume.yaml file in 'kube files' folder.
-4) Lastly, you need to create the Argo resources needed for the workflows to function. file-event.yaml contains the sensor and eventSource. Make sure to create these resources in the same namespace as ISBP.
-5) In folder 'kube files' there is a file 'isbp.yaml'. Run it using 'kubectl -n [namespace_name] apply -f isbp.yaml'. This will create an ISBP  deployment and alo a service to expose ISBP to the network as "isbp". Additionally, it will install a MinIO database with a pre-existing "models" bucket to hold zipped ML models. A service for MinIO will also be created.
-
 ### Software dependecies
 
 Argo Workflows & Events
@@ -30,6 +22,13 @@ Data Lake
 
 ## Installation
 
+Assuming that argo and argo-events are installed in the kubernetes cluster.
+
+1) In order for the app to function as intended, Argo Events must already be present in the cluster.
+2) Make sure to install all deployments in the namespace where you installed Argo Events. Be default the yaml files are installed in "argo-events" so if you have a different namespace, change it accordingly.
+3) Create a persistentvolume and a persistentvolumeclaim using the volume.yaml file in 'kube files' folder.
+4) Lastly, you need to create the Argo resources needed for the workflows to function. file-event.yaml contains the sensor and eventSource. Make sure to create these resources in the same namespace as ISBP.
+5) In folder 'kube files' there is a file 'isbp.yaml'. Run it using 'kubectl -n [namespace_name] apply -f isbp.yaml'. This will create an ISBP  deployment and alo a service to expose ISBP to the network as "isbp". Additionally, it will install a MinIO database with a pre-existing "models" bucket to hold zipped ML models. A service for MinIO will also be created.
 
 ## Maintainers
 **Dimitrios Laskaratos** - *Design & Development* - dlaskaratos@intracom-telecom.com
@@ -44,3 +43,6 @@ Data Lake
 | DELETE |/service/pipeline/stop/{pipeline_id}| Delete a pipeline  |
 | GET |/service/pipeline/{pipeline_id}|Retrieve the details of a pipeline, including the SLA parameters  |
 | GET |/get-active-list|Get the list of all active pipelines  |
+
+## License
+This module is distributed under Apache License 2.0
