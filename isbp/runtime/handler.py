@@ -12,12 +12,15 @@ constructing an ActivePipeline or modifiying an existing one.
 """
 
 from runtime.active_pipeline import ActivePipeline, Status
+from config.config import Config as cnf
 from runtime.http_connectors import register_pipeline, get_sla_details
 from runtime.model_registry import Model, ModelRegistry
 from minio import Minio
 from minio.error import S3Error
 import json
+import os
 import logging
+from zipfile import ZipFile
 from configparser import ConfigParser
 
 log = logging.getLogger(__name__)
@@ -63,11 +66,11 @@ class Handler():
                     threshold = float(rule.get('tolerance'))
                     operator = rule.get('operator')
                     metric_name = rule.get('metric')
-                    model = ModelRegistry.get_model_by_metric(metric_name)
-                    pipeline = ActivePipeline(transactionID, instanceID, productID, slaID, threshold, metric_name, operator, model, location)
+                    models = ModelRegistry.get_models_by_metric(metric_name)
+                    pipeline = ActivePipeline(transactionID, instanceID, productID, slaID, threshold, metric_name, operator, models, location)
                     __active_ops[pipeline.transactionID] = pipeline
                     __count = __count + 1
-                    log.info('Created new pipeline with transactionID: {0} and model: {1}'.format(pipeline.transactionID, pipeline.model))
+                    log.info('Created new pipeline with transactionID: {0} and models: {1}'.format(pipeline.transactionID, list(pipeline.models.keys())))
                     register_pipeline(pipeline.productID)
                 else:
                     log.info('SLA with transactionID {0} and SLAID {1} could not be retrieved'.format(transactionID, slaID))    
@@ -100,14 +103,21 @@ class Handler():
     def set_prediction(data):
         global __active_ops
         pipeline_id = data.get('transactionID')
-        prediction = float(data.get('value'))
+        predictions = data.get('predictions')
         timestamp = data.get('datetimeViolation')
         pipeline = Handler.get_active_pipeline(pipeline_id)
         if pipeline is not None:
-            pipeline.prediction_for_accuracy = prediction
-            pipeline.prediction_date = timestamp
-            result = 'Successfully set prediction for ' + pipeline_id
-            #prediction = Handler.transform(prediction)
+            if not pipeline.isBlocked:
+                for key, prediction in predictions.items():
+                    pipeline.set_model_prediction_for_accuracy(key, prediction)
+                    log.info('--------{0}: {1} prediction with value: {2} and Model {3}--------'.format(pipeline.transactionID, pipeline.metric, str(prediction), key))
+                    result = 'Success'
+                if pipeline.current_model is None:
+                    if len(list(pipeline.selection_accuracies.values())[0]) >= cnf.MODEL_SELECTION_PREDICTIONS:
+                        pipeline.select_model()
+            else:
+                log.info('{0}: Model training is underway. Prediction is discarded...'.format(pipeline.transactionID))
+                result = 'Success'
         else:
             result = 'Pipeline not found.'
             
@@ -159,6 +169,36 @@ class Handler():
         
         return result, status_code
     
+    def get_metrics(pipeline_id):
+        global __active_ops
+        response = None
+        code = 0
+        mdl = {}
+        isSelected = False
+        pipeline = __active_ops.get(pipeline_id)
+        if pipeline is not None:
+            for model, _class in ModelRegistry.get_all_models_by_name().items():
+                dic = {}
+                accuracies = pipeline.historical_accuracy.get(model)
+                predictions = pipeline.historical_predictions.get(model)
+                current_accuracy = accuracies[-1] if len(accuracies) != 0 else None
+                current_error = 1 - current_accuracy if current_accuracy is not None else None
+                prediction = predictions[-1] if len(predictions) != 0 else None
+                dic['current_accuracy'] = current_accuracy
+                dic['current_error'] = current_error
+                dic['prediction'] = prediction
+                if model == pipeline.current_model:
+                    isSelected = True
+                dic['isSelected'] = isSelected
+                mdl[_class] = dic
+            response = {'models': mdl}
+            code = 200
+        else:
+            response = 'ERROR: Pipeline not found.'
+            code = 404
+        response = json.dumps(response)
+        return response, code
+    
     def register_model(data):
         key = data.get('Records')[0].get('s3').get('object').get('key')
         model_id = key.split('.')[0]
@@ -206,6 +246,12 @@ class Handler():
                             model = Handler.__parse_file__(content)
                             model._id = model_id
                             ModelRegistry.register_model(model)
+                        else:
+                            client.fget_object("models", file.object_name, '/data/models/'+file.object_name)
+                            with ZipFile('/data/models/'+file.object_name, 'r') as _zip:
+                                _zip.extractall('/data/models/')
+                            log.info('Extraction of {0} complete'.format(file.object_name))
+                            os.remove('/data/models/'+file.object_name)
             except Exception as e:
                 log.error('{0}'.format(e))
             

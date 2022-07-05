@@ -14,14 +14,18 @@ module = __import__('model')
 models = {}
 
 def init_models():
-    logging.info('Models initialized')
+    logging.info('Initializing models...')
     reg = {'lstmbw': 'LSTM', 'svrbw': 'SVR', 'nbeatsbw': 'NBeats'}
-    for name, _class in reg.items():
-        Model = getattr(module, _class)
-        model = Model()
-        model.name = name
-        model.load('/data/models')
-        models[name] = model
+    try:
+        for name, _class in reg.items():
+            Model = getattr(module, _class)
+            model = Model()
+            model.name = name
+            model.load('/data/models')
+            models[name] = model
+            logging.info('Model {0} loaded'.format(model.name))
+    except Exception as e:
+        logging.info(e)            
     
 
 def get_predictions(data):
@@ -38,13 +42,13 @@ def get_predictions(data):
         prediction = model.predict(x_input)
         predictions[name] = float(prediction)
     
-    operation_timestamp = datetime.now().strftime("%d-%m-%YT%H:%M")
+    operation_timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     data['predictions'] = predictions
     data['datetimeViolation'] = timestamp
     data['datetimePrediction'] = operation_timestamp
     del data['data']
     del data['timestamp']
     data = json.dumps(data)
-    r = requests.post('http://qmp:8000/service/set-prediction', data = data)
+    r = requests.post('http://isbp:8000/service/set-prediction', data = data)
     print(r.text)
 

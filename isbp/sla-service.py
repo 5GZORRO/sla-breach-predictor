@@ -13,6 +13,7 @@ from config.config import Config
 from runtime.http_connectors import register_app
 import logging
 import threading
+import os
 from os import path
 import shutil
 import ctypes
@@ -29,6 +30,8 @@ def on_startup():
     global consumer_thread
     global topic_list
     Config.load_configuration()
+    if not path.exists('/data/models/'):
+        os.makedirs('/data/models/', exist_ok=True)
     Handler.init()
     status = register_app()
     if status > 0:
@@ -93,6 +96,11 @@ def set_new_topic(topic_name: str):
     consumer.subscribe(topic_list)
     return Response('Topic received')
 
+@app.get('/service/metrics/{pipeline_id}')
+def get_pipeline_metrics(pipeline_id: str):
+    response, code = Handler.get_metrics(pipeline_id)
+    return Response(status_code = code, content = response, media_type = Media.APP_JSON)
+
 @app.post('/service/sla')
 async def submit_slaID(request: Request):
     data = await request.json()
@@ -109,9 +117,13 @@ def copy_model():
 @app.post('/service/donwload-model')
 async def set_download_model(request: Request):
     data = await request.json()
-    model_id = data.get('id')
-    Handler.set_model_download(model_id)
-    return Response(content = 'Set successful', media_type = Media.TEXT_PLAIN)
+    model_id = data.get('name')
+    pipeline_id = data.get('pipeline')
+    pipeline = Handler.get_active_pipeline(pipeline_id)
+    pipeline.isBlocked = False
+    # Handler.download_model(model_id)
+    logging.info('Training of model {0} has completed successfully'.format(model_id))
+    return Response(content = 'Success', media_type = Media.TEXT_PLAIN)
 
 @app.get('/service/consumer-health')
 def check_consumer_health():

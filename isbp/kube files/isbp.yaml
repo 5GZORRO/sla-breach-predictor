@@ -29,15 +29,7 @@ spec:
         - name: shared-test
           persistentVolumeClaim:
             claimName: isbp-claim
-      tolerations:
-      - key: "node-role.kubernetes.io/controlplane"
-        operator: "Equal"
-        value: "true"
-        effect: "NoSchedule"
-      - key: "node-role.kubernetes.io/etcd"
-        operator: "Equal"
-        value: "true"
-        effect: "NoExecute"
+      
 ---
 
 apiVersion: apps/v1
@@ -78,6 +70,39 @@ spec:
         ports:
         - containerPort: 9000
 ---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: predictor
+  labels:
+    app: predictor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: predictor
+  template:
+    metadata:
+      labels:
+        app: predictor
+    spec:
+      containers:
+      - name: predictor
+        image: dimitrislask/isbp:predictor
+        imagePullPolicy: Always
+        command: ["uvicorn", "service:app", "--host", "0.0.0.0", "--port", "8001"]
+        ports:
+        - containerPort: 8001
+          name: predictor
+        volumeMounts:
+        - name: shared-test
+          mountPath: /data/
+      volumes:
+        - name: shared-test
+          persistentVolumeClaim:
+            claimName: isbp-claim
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -86,6 +111,7 @@ spec:
   ports:
   - port: 9000
     targetPort: 9000
+    nodePort: 32001
   selector:
     app: isbp-minio
   type: NodePort
@@ -99,7 +125,24 @@ spec:
   ports:
   - port: 8000
     targetPort: 8000
+    nodePort: 32000
   selector:
     app: isbp
+  type: NodePort
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: predictor
+spec:
+  ports:
+  - port: 8001
+    targetPort: 8001
+    nodePort: 32002
+    
+  selector:
+    app: predictor
   type: NodePort
 

@@ -16,11 +16,11 @@ spec:
     storage: 100Mi
   volumeMode: Filesystem
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
   storageClassName: isbp
   hostPath:
-    path: /Users/dlaskaratos/Desktop/data
+    path: /data/
 
 ---
 kind: PersistentVolumeClaim
@@ -29,7 +29,7 @@ metadata:
   name: isbp-claim
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   volumeMode: Filesystem
   resources:
     requests:

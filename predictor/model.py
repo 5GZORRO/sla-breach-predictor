@@ -19,7 +19,7 @@ class Model(ABC):
         super().__init__()
         self.model = None
         self.name = None
-        self.extension = 'zip'
+        self.extension = ''
         
     @abstractmethod
     def save(self, path):
@@ -116,7 +116,7 @@ class NBeats(Model):
         
         r = np.array(values)
         series = TimeSeries.from_values(r).astype(np.float32)
-        transformer = load(open("../../data/models/nbeats_scaler.pkl", "rb"))
+        transformer = load(open("/data/models/nbeats_scaler.pkl", "rb"))
         values_scaled = transformer.transform(series)
         prediction = self.model.predict(series = values_scaled,
                                           n = 1, 

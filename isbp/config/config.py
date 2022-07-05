@@ -37,13 +37,15 @@ class Config():
         kafka = __conf['kafka']
         connectors = __conf['connectors']
         
-        Config.TRAIN_DATA_POINTS = int(operations['train_data_points'])
-        Config.POINTS_FOR_MEDIAN_ACCURACY = int(operations['points_for_median_accuracy'])
-        Config.GLOBAL_ACCURACY = int(operations['global_accuracy'])
-        Config.PREDICTIONS_MODEl_SELECTION = int(operations['predictions_model_selection'])
+        Config.GLOBAL_ACCURACY = float(__conf['operations']['global_accuracy'])
+        Config.TRAIN_DATA_POINTS = int(__conf['operations']['train_data_points'])
+        Config.POINTS_FOR_MEDIAN_ACCURACY = int(__conf['operations']['points_for_median_accuracy'])
+        Config.MODEL_SELECTION_PREDICTIONS = int(__conf['operations']['model_selection_predictions'])
         
         Config.KAFKA_HOST = kafka['host']
-        Config.KAFKA_PORT = int(kafka['port'])
+        
+        if kafka['port'] != '':
+            Config.KAFKA_PORT = int(kafka['port'])
         mon_data_topic = kafka['mon_topic']
         if mon_data_topic != "":
             Config.TOPICS.append(mon_data_topic)

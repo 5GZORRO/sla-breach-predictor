@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: EventSource
 metadata:
   name: file
-  namespace: argo-events
+  namespace: isbp
 spec:
   template:
     container:
@@ -13,22 +13,14 @@ spec:
       - name: shared-test
         persistentVolumeClaim:
           claimName: isbp-claim
-    tolerations:
-    - key: "node-role.kubernetes.io/controlplane"
-      operator: "Equal"
-      value: "true"
-      effect: "NoSchedule"
-    - key: "node-role.kubernetes.io/etcd"
-      operator: "Equal"
-      value: "true"
-      effect: "NoExecute"
+    
   file:
     predict:
       watchPathConfig:
         # directory to watch
         directory: /data/
         # path to watch
-        path: data.json
+        pathRegexp: (.+)-data.json
       # type of the event
       # supported types are: CREATE, WRITE, REMOVE, RENAME, CHMOD
       eventType: CREATE
@@ -37,7 +29,7 @@ spec:
         # directory to watch
         directory: /data/
         # path to watch
-        path: train.csv
+        pathRegexp: (.+)-model.json
       # type of the event
       # supported types are: CREATE, WRITE, REMOVE, RENAME, CHMOD
       eventType: CREATE
@@ -48,7 +40,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: file
-  namespace: argo-events
+  namespace: isbp
 spec:
   template:
     serviceAccountName: argo-events-sa
@@ -76,19 +68,33 @@ spec:
                 generateName: predict-watcher-
               spec:
                 entrypoint: predict
+                arguments:
+                  parameters:
+                  - name: message
+                    # the value will get overridden by event payload from test-dep
+                    value: hey world
                 templates:
-                - name: predict
-                  container:
-                    image: dimitrislask/isbp:predict
-                    imagePullPolicy: Always
-                    command: ["python", "predict.py"]
-                    volumeMounts:
-                    - name: shared-test
-                      mountPath: /data/
-                  volumes:
-                    - name: shared-test
-                      persistentVolumeClaim:
-                        claimName: isbp-claim
+                  - name: predict
+                    inputs:
+                      parameters:
+                      - name: message
+                    container:
+                      image: dimitrislask/isbp:predict
+                      imagePullPolicy: Always
+                      command: ["python", "predict.py"]
+                      args: ["{{inputs.parameters.message}}"]
+                      volumeMounts:
+                      - name: shared-test
+                        mountPath: /data/
+                    volumes:
+                      - name: shared-test
+                        persistentVolumeClaim:
+                          claimName: isbp-claim
+          parameters:
+              - src:
+                  dependencyName: predict-dep
+                  dataKey: name
+                dest: spec.arguments.parameters.0.value
               
                   
     - template:

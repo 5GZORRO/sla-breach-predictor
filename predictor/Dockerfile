@@ -1,8 +1,8 @@
 FROM tensorflow-python
 
-RUN pip install fastapi
+#RUN pip install fastapi
 
-RUN pip install uvicorn 
+#RUN pip install uvicorn 
 
 COPY . .
 

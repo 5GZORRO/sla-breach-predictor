@@ -64,14 +64,28 @@ class ModelRegistry():
         global __registry
         return __registry.get(model_id)
     
-    def get_model_by_metric(metric_name):
+    def get_models_by_metric(metric_name):
         global __registry
-        model = None
+        models = {}
         for key, value in __registry.items():
             if value.metric == metric_name:
-                model = value._id
-                break
+                models[key] = value._class
         
+        return models
+    
+    
+    def get_all_models_by_name():
+        global __registry
+        models = {}
+        for key, value in __registry.items():
+            models[key] = value._class
+        
+        return models
+     
+    def get_model_by_name(name):
+        global __registry
+        
+        model =__registry.get(name)
         return model
         
     
