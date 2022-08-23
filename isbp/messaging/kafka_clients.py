@@ -66,6 +66,10 @@ class Consumer():
                     if data.get('eventType') == 'new_SLA':
                         log.info('Received new SLA event with transaction ID: {0}'.format(transactionID))
                         pipeline = Handler.create_new_pipeline(data)
+                    elif data.get('eventType') == 'SLA_termination':
+                        log.info('Received termination request with transaction ID: {0}'.format(transactionID))
+                        result, status_code = Handler.terminate_pipeline(transactionID)
+                        log.info(result)
                     elif data.get('eventType') == 'new_SLA_ACK':
                         log.info('Received instantiation acknowledgement with transaction ID: {0}'.format(transactionID))
                         pipeline = Handler.get_active_pipeline(transactionID)
@@ -79,30 +83,12 @@ class Consumer():
                     pipeline = Handler.get_active_pipeline(pipeline_id)
                     if pipeline is not None:
                         pipeline.try_insert(metric, date)
-                        if list(pipeline.selection_predictions.values())[0] != 0:
-                            pipeline.get_single_prediction_accuracy(metric)              
-                        if pipeline.current_model is not None:
-                            if len(pipeline.selection_accuracies.get(pipeline.current_model._id)) == pipeline.points_for_median_accuracy: 
-                                pipeline.median_accuracy = pipeline.calculate_median_accuracy()
-                        if pipeline.current_model != None and pipeline.median_accuracy > 0.0 and pipeline.median_accuracy < cnf.GLOBAL_ACCURACY:
-                            dictionary = {'model': pipeline.current_model._id,
-                                          'class': pipeline.current_model._class,
-                                          'pipeline': pipeline.transactionID}
-                            with open(cnf.TEMP_FILE_PATH + pipeline.transactionID+'-model.json', 'w') as outfile:
-                                json.dump(dictionary, outfile)
-                            log.info('Launching training job for {0} and model {1}'.format(pipeline.transactionID, pipeline.current_model._id))
-                            pipeline.median_accuracy = 0.0
-                            pipeline.clear_predictions()
-                            pipeline.isBlocked = True
-                        if len(pipeline.prediction_list) == pipeline.n_steps:
-                            pipeline.request_prediction(date)
+                        pipeline.get_single_prediction_accuracy(metric)              
+                        pipeline.median_accuracy = pipeline.calculate_median_accuracy()
+                        pipeline.check_training()
+                        pipeline.request_prediction(date)
             except Exception as e:
                 log.error(e)
-                    
-    def transform(plist, features):
-        X = np.array([plist])
-        inp = X.reshape((X.shape[0], X.shape[1], features))
-        return inp
                 
     def stop():
        global consumer

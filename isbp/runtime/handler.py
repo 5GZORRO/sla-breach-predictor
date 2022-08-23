@@ -22,6 +22,7 @@ import os
 import logging
 from zipfile import ZipFile
 from configparser import ConfigParser
+import requests
 
 log = logging.getLogger(__name__)
 
@@ -222,9 +223,9 @@ class Handler():
             model_id = key.split('.')[0]
             ModelRegistry.deregister_model(model_id)
     
-    def set_model_download(_id):
-        model = ModelRegistry.get(_id)
-        model.download = True
+    def reload_model(data):
+        data = json.dumps(data)
+        requests.post('http://predictor:8001/reload', data = data)
     
     def __registry_init__():
         

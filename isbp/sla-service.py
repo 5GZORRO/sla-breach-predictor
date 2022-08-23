@@ -115,13 +115,13 @@ def copy_model():
         shutil.copytree(src, dest)
 
 @app.post('/service/donwload-model')
-async def set_download_model(request: Request):
+async def set_download_model(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
     model_id = data.get('name')
     pipeline_id = data.get('pipeline')
     pipeline = Handler.get_active_pipeline(pipeline_id)
     pipeline.isBlocked = False
-    # Handler.download_model(model_id)
+    background_tasks.add_task(Handler.reload_model, data)
     logging.info('Training of model {0} has completed successfully'.format(model_id))
     return Response(content = 'Success', media_type = Media.TEXT_PLAIN)
 
@@ -148,7 +148,7 @@ async def set_prediction(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
     result, pipeline, prediction = Handler.set_prediction(data)
     if pipeline is not None:
-        if pipeline.check_violation(float(prediction)):
+        if pipeline.current_model is not None and pipeline.check_violation(float(prediction)):
             notification = breach_notification(data, prediction)
             Producer.send(notification)
             pipeline.waiting_on_ack = True

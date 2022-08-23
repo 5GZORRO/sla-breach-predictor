@@ -25,7 +25,24 @@ def init_models():
             models[name] = model
             logging.info('Model {0} loaded'.format(model.name))
     except Exception as e:
-        logging.info(e)            
+        logging.info(e)
+        
+def reload_model(_model: str, _class: str):
+    logging.info('Reloading model {0} ...'.format(_model))
+    result = None
+    try:
+        models[_model] = None
+        Model = getattr(module, _class)
+        model = Model()
+        model.name = _model
+        model.load('/data/models')
+        models[_model] = model
+        logging.info('Model {0} successfully reloaded'.format(model.name))
+        result = 'Model ', model.name, 'successfully reloaded'
+    except Exception as e:
+        logging.info(e)
+        result = 'Error reloading model ', model.name, ': ', str(e)
+    return result
     
 
 def get_predictions(data):
@@ -38,7 +55,7 @@ def get_predictions(data):
     predictions = {}
     for name, _class in model_list.items():
         model = models.get(name)
-        model.load('/data/models')
+        # model.load('/data/models')
         prediction = model.predict(x_input)
         predictions[name] = float(prediction)
     

@@ -28,7 +28,7 @@ class ActivePipeline():
         self.prediction_for_accuracy = 0
         self.points_for_median_accuracy = cnf.POINTS_FOR_MEDIAN_ACCURACY
         self.running_accuracy = 0
-        self.median_accuracy = 0
+        self.median_accuracy = 0.0
         self.prediction_date = None
         self.features = 1
         self.n_steps = 3
@@ -70,26 +70,29 @@ class ActivePipeline():
         self.__waiting_on_ack = value
     
     def get_single_prediction_accuracy(self, real_value):
-        if real_value > 0.0:
-            accuracy = 0
-            for key, prediction in self.selection_predictions.items():
-                if real_value < prediction:
-                    accuracy = real_value/prediction
-                else:
-                    accuracy = prediction/real_value
-                if accuracy > 0.0:
-                    log.info('--------{0}: Model: {1} Prediction Accuracy: {2}--------'.format(self.transactionID, key, str(accuracy)))
-                    self.selection_accuracies.get(key).append(accuracy)
-                    self.historical_accuracy.get(key).append(accuracy)
+        if list(self.selection_predictions.values())[0] != 0:
+            if real_value > 0.0:
+                accuracy = 0
+                for key, prediction in self.selection_predictions.items():
+                    if real_value < prediction:
+                        accuracy = real_value/prediction
+                    else:
+                        accuracy = prediction/real_value
+                    if accuracy > 0.0:
+                        log.info('--------{0}: Model: {1} Prediction Accuracy: {2}--------'.format(self.transactionID, key, str(accuracy)))
+                        self.selection_accuracies.get(key).append(accuracy)
+                        self.historical_accuracy.get(key).append(accuracy)
     
     
     def calculate_median_accuracy(self):
         median_accuracy = 0.0
-        model = self.current_model._id
-        accuracy_list = self.selection_accuracies.get(model)
-        median_accuracy = statistics.mean(accuracy_list)
-        log.info('--------{0}: Model {1} average accuracy is: {2}--------'.format(self.transactionID, model, median_accuracy))
-        self.selection_accuracies.get(model).clear()
+        if self.current_model is not None:
+            if len(self.selection_accuracies.get(self.current_model._id)) == self.points_for_median_accuracy:
+                model = self.current_model._id
+                accuracy_list = self.selection_accuracies.get(model)
+                median_accuracy = statistics.mean(accuracy_list)
+                log.info('--------{0}: Model {1} average accuracy is: {2}--------'.format(self.transactionID, model, median_accuracy))
+                self.selection_accuracies.get(model).clear()
         return median_accuracy
     
     def check_violation(self, prediction):
@@ -124,9 +127,10 @@ class ActivePipeline():
             self.currentDate = date
     
     def request_prediction(self, date):
-        if not self.isBlocked and not self.waiting_on_ack:
-            log.info('Launching prediction job...')
-            dictionary = {'transactionID': self.transactionID,
+        if len(self.prediction_list) == self.n_steps:
+            if not self.isBlocked and not self.waiting_on_ack:
+                log.info('Launching prediction job...')
+                dictionary = {'transactionID': self.transactionID,
                           'instanceID' : self.instanceID,
                           'productID' : self.productID,
                           'timestamp' : date,
@@ -134,10 +138,22 @@ class ActivePipeline():
                           'models': self.models,
                           'place' : self.location
                                           }
-            data = json.dumps(dictionary)
-            r = requests.post('http://predictor:8001/predict', data = data)
+                data = json.dumps(dictionary)
+                requests.post('http://predictor:8001/predict', data = data)
         
-        self.prediction_list.pop(0)
+            self.prediction_list.pop(0)
+        
+    def check_training(self):
+        if self.current_model != None and self.median_accuracy > 0.0 and self.median_accuracy < cnf.GLOBAL_ACCURACY:
+            dictionary = {'model': self.current_model._id,
+                          'class': self.current_model._class,
+                          'pipeline': self.transactionID}
+            with open(cnf.TEMP_FILE_PATH + self.transactionID+'-model.json', 'w') as outfile:
+                json.dump(dictionary, outfile)
+            log.info('Launching training job for {0} and model {1}'.format(self.transactionID, self.current_model._id))
+            self.median_accuracy = 0.0
+            self.clear_predictions()
+            self.isBlocked = True
     
     def select_model(self):
         best_accuracy = 0
