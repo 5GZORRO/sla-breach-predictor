@@ -85,7 +85,7 @@ class Consumer():
                         pipeline.try_insert(metric, date)
                         pipeline.get_single_prediction_accuracy(metric)              
                         pipeline.median_accuracy = pipeline.calculate_median_accuracy()
-                        pipeline.check_training()
+                        # pipeline.check_training()
                         pipeline.request_prediction(date)
             except Exception as e:
                 log.error(e)

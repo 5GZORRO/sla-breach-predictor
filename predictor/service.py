@@ -8,6 +8,7 @@ Created on Thu Jun 16 09:42:03 2022
 from fastapi import FastAPI, Response, Request, BackgroundTasks
 import logging
 import predict
+from folder import create_transaction_folder
 
 app = FastAPI()
 
@@ -15,13 +16,19 @@ app = FastAPI()
 def on_startup():
     logging.basicConfig(level=logging.INFO)
     logging.info('Starting ML forecast service...')
-    predict.init_models()
+    # predict.init_models()
     
 
 @app.post('/predict')
 async def set_config(request:Request, background_tasks: BackgroundTasks):
     data = await request.json()
     background_tasks.add_task(predict.get_predictions, data)
+    return Response(content = 'Request received', media_type = 'text/plain')
+
+@app.post('/load')
+async def load_models(request:Request, background_tasks: BackgroundTasks):
+    data = await request.json()
+    background_tasks.add_task(create_transaction_folder, data)
     return Response(content = 'Request received', media_type = 'text/plain')
 
 @app.post('/reload')

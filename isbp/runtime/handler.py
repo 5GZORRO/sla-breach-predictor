@@ -13,7 +13,7 @@ constructing an ActivePipeline or modifiying an existing one.
 
 from runtime.active_pipeline import ActivePipeline, Status
 from config.config import Config as cnf
-from runtime.http_connectors import register_pipeline, get_sla_details
+from runtime.http_connectors import register_pipeline, get_sla_details, load_models
 from runtime.model_registry import Model, ModelRegistry
 from minio import Minio
 from minio.error import S3Error
@@ -67,12 +67,13 @@ class Handler():
                     threshold = float(rule.get('tolerance'))
                     operator = rule.get('operator')
                     metric_name = rule.get('metric')
-                    models = ModelRegistry.get_models_by_metric(metric_name)
+                    models = ModelRegistry.get_models_by_name('lstmbw')
                     pipeline = ActivePipeline(transactionID, instanceID, productID, slaID, threshold, metric_name, operator, models, location)
                     __active_ops[pipeline.transactionID] = pipeline
                     __count = __count + 1
                     log.info('Created new pipeline with transactionID: {0} and models: {1}'.format(pipeline.transactionID, list(pipeline.models.keys())))
                     register_pipeline(pipeline.productID)
+                    load_models(pipeline.transactionID, models)
                 else:
                     log.info('SLA with transactionID {0} and SLAID {1} could not be retrieved'.format(transactionID, slaID))    
             except Exception as e:

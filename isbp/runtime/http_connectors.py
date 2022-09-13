@@ -63,3 +63,10 @@ def get_sla_details(slaID):
         result = 'SLA not found or could not be retrieved'
     
     return response, result
+
+def load_models(transactionid, models):
+    data = {'transactionid': transactionid, 'models': models}
+    data = json.dumps(data)
+    request = requests.post('http://predictor:8001/load', data = data)
+    response = request.text
+    log.info(response)

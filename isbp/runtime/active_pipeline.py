@@ -51,7 +51,7 @@ class ActivePipeline():
         self.selection_predictions = {}
         self.historical_accuracy = {}
         self.historical_predictions = {}
-        self.__set_model_dicts__()
+        # self.__set_model_dicts__()
     
     @property
     def status(self):

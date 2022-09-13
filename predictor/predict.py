@@ -13,19 +13,19 @@ import logging
 module = __import__('model')
 models = {}
 
-def init_models():
-    logging.info('Initializing models...')
-    reg = {'lstmbw': 'LSTM', 'svrbw': 'SVR', 'nbeatsbw': 'NBeats'}
-    try:
-        for name, _class in reg.items():
-            Model = getattr(module, _class)
-            model = Model()
-            model.name = name
-            model.load('/data/models')
-            models[name] = model
-            logging.info('Model {0} loaded'.format(model.name))
-    except Exception as e:
-        logging.info(e)
+# def init_models():
+#     logging.info('Initializing models...')
+#     reg = {'lstmbw': 'LSTM', 'svrbw': 'SVR', 'nbeatsbw': 'NBeats'}
+#     try:
+#         for name, _class in reg.items():
+#             Model = getattr(module, _class)
+#             model = Model()
+#             model.name = name
+#             model.load('/data/models')
+#             models[name] = model
+#             logging.info('Model {0} loaded'.format(model.name))
+#     except Exception as e:
+#         logging.info(e)
         
 def reload_model(_model: str, _class: str):
     logging.info('Reloading model {0} ...'.format(_model))
@@ -68,4 +68,14 @@ def get_predictions(data):
     data = json.dumps(data)
     r = requests.post('http://isbp:8000/service/set-prediction', data = data)
     print(r.text)
+    
+def copy_models(transactionid, path, md):
+    
+    for name, _class in md.items():
+        Model = getattr(module, _class)
+        model = Model()
+        model.name = name
+        model.copy(path)
+        models[transactionid+"-"+model.name] = model
+        logging.info('Loaded model: {0}'.format(transactionid+", "+model.name))
 

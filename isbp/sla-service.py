@@ -148,7 +148,7 @@ async def set_prediction(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
     result, pipeline, prediction = Handler.set_prediction(data)
     if pipeline is not None:
-        if pipeline.current_model is not None and pipeline.check_violation(float(prediction)):
+        if pipeline.check_violation(float(prediction)):
             notification = breach_notification(data, prediction)
             Producer.send(notification)
             pipeline.waiting_on_ack = True
