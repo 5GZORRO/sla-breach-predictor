@@ -55,6 +55,7 @@ class Handler():
         instanceID = data.get('instanceID')
         slaID = data.get('SLAID')
         location = data.get('place')
+        opaque_params = data.get('opaque_params')
         pipeline = __active_ops.get(transactionID)
         if pipeline is not None:
             log.info('Pipeline already exists')
@@ -68,7 +69,7 @@ class Handler():
                     operator = rule.get('operator')
                     metric_name = rule.get('metric')
                     models = ModelRegistry.get_models_by_name('lstmbw')
-                    pipeline = ActivePipeline(transactionID, instanceID, productID, slaID, threshold, metric_name, operator, models, location)
+                    pipeline = ActivePipeline(transactionID, instanceID, productID, slaID, threshold, metric_name, operator, models, location, opaque_params)
                     __active_ops[pipeline.transactionID] = pipeline
                     __count = __count + 1
                     log.info('Created new pipeline with transactionID: {0} and models: {1}'.format(pipeline.transactionID, list(pipeline.models.keys())))

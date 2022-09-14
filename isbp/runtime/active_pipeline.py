@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 class ActivePipeline():
     
-    def __init__(self, transactionID, instanceID, productID, slaID, threshold, metric_name, operator, models, location) -> None:
+    def __init__(self, transactionID, instanceID, productID, slaID, threshold, metric_name, operator, models, location, opaque_params) -> None:
         self.name = None
         self.description = None
         self.training_list = []
@@ -42,6 +42,7 @@ class ActivePipeline():
         self.currentDate = None
         self.operator = operator
         self.location = location
+        self.opaque_params = opaque_params
         self.__waiting_on_ack = False
         self.models = models
         self.__status = Status.ACTIVE
@@ -136,7 +137,8 @@ class ActivePipeline():
                           'timestamp' : date,
                           'data' : self.prediction_list,
                           'models': self.models,
-                          'place' : self.location
+                          'place' : self.location,
+                          'opaque_params': self.opaque_params
                                           }
                 data = json.dumps(dictionary)
                 requests.post('http://predictor:8001/predict', data = data)
