@@ -84,8 +84,9 @@ class ModelRegistry():
      
     def get_model_by_name(name):
         global __registry
-        
+       
         model =__registry.get(name)
+        
         return model
         
     

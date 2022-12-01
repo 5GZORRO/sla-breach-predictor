@@ -12,6 +12,9 @@ from pickle import load
 from tensorflow import keras
 from joblib import load
 from darts import TimeSeries
+import os
+from os import path
+import shutil
 
 class Model(ABC):
     
@@ -36,6 +39,10 @@ class Model(ABC):
     @abstractmethod
     def train(self, dataset):
         pass
+    
+    def copy(self, p):
+       if path.exists(p):
+          shutil.copy('/data/models/'+self.name+self.extension, p) 
     
 class LSTM(Model):
     
@@ -62,6 +69,12 @@ class LSTM(Model):
         
     def _print(self):
         print(self.model)
+    
+    def copy(self, p):
+        if path.exists(p):
+            if not path.exists(p+'/'+self.name):
+                os.makedirs(p+'/'+self.name)
+            shutil.copytree('/data/models/'+self.name, p+'/'+self.name, dirs_exist_ok=True)
 
 class SVR(Model):
     
@@ -97,6 +110,7 @@ class SVR(Model):
     
     def _print(self):
         print(self.model)
+        
         
 class NBeats(Model):
     
