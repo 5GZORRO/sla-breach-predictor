@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 class ActivePipeline():
     
-    def __init__(self, transactionID, instanceID, productID, slaID, threshold, metric_name, operator, models, location, opaque_params) -> None:
+    def __init__(self, transactionID, instanceID, productID, slaID, threshold, metric_name, operator, model, location, opaque_params, operation_type) -> None:
         self.name = None
         self.description = None
         self.training_list = []
@@ -43,8 +43,9 @@ class ActivePipeline():
         self.operator = operator
         self.location = location
         self.opaque_params = opaque_params
+        self.operation_type = operation_type
         self.__waiting_on_ack = False
-        self.models = models
+        self.model = model
         self.__status = Status.ACTIVE
         self.current_model = None
         self.isBlocked = False
@@ -71,29 +72,25 @@ class ActivePipeline():
         self.__waiting_on_ack = value
     
     def get_single_prediction_accuracy(self, real_value):
-        if list(self.selection_predictions.values())[0] != 0:
             if real_value > 0.0:
                 accuracy = 0
-                for key, prediction in self.selection_predictions.items():
-                    if real_value < prediction:
-                        accuracy = real_value/prediction
-                    else:
-                        accuracy = prediction/real_value
-                    if accuracy > 0.0:
-                        log.info('--------{0}: Model: {1} Prediction Accuracy: {2}--------'.format(self.transactionID, key, str(accuracy)))
-                        self.selection_accuracies.get(key).append(accuracy)
-                        self.historical_accuracy.get(key).append(accuracy)
+                if real_value < self.prediction_for_accuracy:
+                    accuracy = real_value/self.prediction_for_accuracy
+                else:
+                    accuracy = self.prediction_for_accuracy/real_value
+                if accuracy > 0.0:
+                    log.info('--------{0}: Prediction Accuracy: {1}--------'.format(self.transactionID, str(accuracy)))
+                self.accuracies.append(accuracy)
+                        
     
     
     def calculate_median_accuracy(self):
         median_accuracy = 0.0
-        if self.current_model is not None:
-            if len(self.selection_accuracies.get(self.current_model._id)) == self.points_for_median_accuracy:
+        if len(self.accuracies) == self.points_for_median_accuracy:
                 model = self.current_model._id
-                accuracy_list = self.selection_accuracies.get(model)
-                median_accuracy = statistics.mean(accuracy_list)
+                median_accuracy = statistics.mean(self.accuracies)
                 log.info('--------{0}: Model {1} average accuracy is: {2}--------'.format(self.transactionID, model, median_accuracy))
-                self.selection_accuracies.get(model).clear()
+                self.accuracies.clear()
         return median_accuracy
     
     def check_violation(self, prediction):
@@ -108,16 +105,9 @@ class ActivePipeline():
         elif self.operator == '.eq':
             return prediction == self.threshold
     
-    def set_model_prediction_for_accuracy(self, key, value):
-        self.selection_predictions[key] = value
-        self.historical_predictions.get(key).append(value)
-    
-    def __set_model_dicts__(self):
-        for key in self.models.keys():
-            self.selection_accuracies[key] = []
-            self.selection_predictions[key] = 0.0
-            self.historical_accuracy[key] = []
-            self.historical_predictions[key] = []
+    # def set_model_prediction_for_accuracy(self, key, value):
+    #     self.selection_predictions[key] = value
+    #     self.historical_predictions.get(key).append(value)
     
     def try_insert(self, metric, date):
         
@@ -136,7 +126,7 @@ class ActivePipeline():
                           'productID' : self.productID,
                           'timestamp' : date,
                           'data' : self.prediction_list,
-                          'models': self.models,
+                          'name': self.model.name,
                           'place' : self.location,
                           'opaque_params': self.opaque_params
                                           }

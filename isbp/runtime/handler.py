@@ -13,7 +13,7 @@ constructing an ActivePipeline or modifiying an existing one.
 
 from runtime.active_pipeline import ActivePipeline, Status
 from config.config import Config as cnf
-from runtime.http_connectors import register_pipeline, get_sla_details, load_models
+from runtime.http_connectors import register_pipeline, get_sla_details, load_models, delete_transaction_folder
 from runtime.model_registry import Model, ModelRegistry
 from minio import Minio
 from minio.error import S3Error
@@ -32,15 +32,19 @@ class Handler():
     __active_ops = None
     __parser = None
     __count = 0
+    __p_counter = 0
     
     def init():
         global __active_ops
         global __count
         global __parser
+        global __p_counter
          
         __active_ops = {}
         __count = 0
+        __p_counter = 0
         __parser = ConfigParser()
+        Handler.__upload_models()
         Handler.__registry_init__()
     
     def get_list():
@@ -50,12 +54,14 @@ class Handler():
     def create_new_pipeline(data):
         global __active_ops
         global __count
+        # log.info(data)
         transactionID = data.get('transactionID')
         productID = data.get('productID')
         instanceID = data.get('instanceID')
         slaID = data.get('SLAID')
         location = data.get('place')
         opaque_params = data.get('opaque_params')
+        operation_type = data.get('consequence')
         pipeline = __active_ops.get(transactionID)
         if pipeline is not None:
             log.info('Pipeline already exists')
@@ -63,18 +69,30 @@ class Handler():
         else:
             try:
                 sla_details, status = get_sla_details(slaID)
+                log.info(status)
                 if sla_details is not None:
                     rule = sla_details.get('rule')[0]
-                    threshold = float(rule.get('tolerance'))
+                    threshold = float(rule.get('referenceValue'))
                     operator = rule.get('operator')
                     metric_name = rule.get('metric')
-                    models = ModelRegistry.get_models_by_name('lstmbw')
-                    pipeline = ActivePipeline(transactionID, instanceID, productID, slaID, threshold, metric_name, operator, models, location, opaque_params)
+                    model = ModelRegistry.get_model_by_name('lstmbw')
+                    pipeline = ActivePipeline(transactionID, 
+                                              instanceID, 
+                                              productID, 
+                                              slaID, 
+                                              threshold, 
+                                              metric_name, 
+                                              operator, 
+                                              model, 
+                                              location, 
+                                              opaque_params, 
+                                              operation_type)
                     __active_ops[pipeline.transactionID] = pipeline
+                    pipeline.threshold = 22.0
                     __count = __count + 1
-                    log.info('Created new pipeline with transactionID: {0} and models: {1}'.format(pipeline.transactionID, list(pipeline.models.keys())))
+                    log.info('Created new pipeline with transactionID: {0} and models: {1}'.format(pipeline.transactionID, pipeline.model.name))
                     register_pipeline(pipeline.productID)
-                    load_models(pipeline.transactionID, models)
+                    load_models(pipeline.transactionID, model.name, model._class)
                 else:
                     log.info('SLA with transactionID {0} and SLAID {1} could not be retrieved'.format(transactionID, slaID))    
             except Exception as e:
@@ -98,6 +116,7 @@ class Handler():
         else:
             del __active_ops[pipeline_id]
             __count = __count - 1
+            delete_transaction_folder(pipeline.transactionID, pipeline.model.name)
             result = 'Pipeline successfully terminated.'
             status_code = 200
         
@@ -105,22 +124,20 @@ class Handler():
         
     def set_prediction(data):
         global __active_ops
+        global __p_counter
+        
+        __p_counter = __p_counter+1
+        result = None
         pipeline_id = data.get('transactionID')
-        predictions = data.get('predictions')
+        prediction = data.get('prediction')
         timestamp = data.get('datetimeViolation')
         pipeline = Handler.get_active_pipeline(pipeline_id)
         if pipeline is not None:
             if not pipeline.isBlocked:
-                for key, prediction in predictions.items():
-                    pipeline.set_model_prediction_for_accuracy(key, prediction)
-                    log.info('--------{0}: {1} prediction with value: {2} and Model {3}--------'.format(pipeline.transactionID, pipeline.metric, str(prediction), key))
-                    result = 'Success'
-                if pipeline.current_model is None:
-                    if len(list(pipeline.selection_accuracies.values())[0]) >= cnf.MODEL_SELECTION_PREDICTIONS:
-                        pipeline.select_model()
-            else:
-                log.info('{0}: Model training is underway. Prediction is discarded...'.format(pipeline.transactionID))
-                result = 'Success'
+                pipeline.prediction_for_accuracy = prediction
+                if __p_counter%5==0 or __p_counter%5==5:
+                    log.info('{0}: Received prediction with value {1}'.format(pipeline_id, str(prediction)))
+                result = 'Prediction set successfully'
         else:
             result = 'Pipeline not found.'
             
@@ -287,3 +304,17 @@ class Handler():
         model = Model(model_name, model_metric, model_class, model_lib)
         return model
         
+    def __upload_models():
+        from minio import Minio
+        log.info('Uploading models...')
+        try:
+                client = Minio(
+                "isbpminio:9000",
+                access_key="isbp",
+                secret_key="isbpminio",
+                secure=False
+                )
+                for filename in os.listdir('models/'):
+                    result = client.fput_object("models", filename, 'models/'+filename)
+        except Exception as e:
+                print(e)

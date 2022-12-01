@@ -56,6 +56,7 @@ class Consumer():
     def start():
         global topics
         global consumer
+        counter = 0
         log.info('New consumer thread started')
         for message in consumer:
             try:
@@ -75,11 +76,13 @@ class Consumer():
                         pipeline = Handler.get_active_pipeline(transactionID)
                         pipeline.waiting_on_ack = False
                 else:
+                    counter = counter+1
                     data = data.get('monitoringData')
                     pipeline_id = data.get('transactionID')
                     metric = data.get('metricValue')
                     date = data.get('timestamp')
-                    log.info('Received metric {0} with slice ID {1}'.format(metric, pipeline_id))
+                    if counter%5==0:
+                        log.info('Received metric {0} with slice ID: {1}'.format(metric, pipeline_id))
                     pipeline = Handler.get_active_pipeline(pipeline_id)
                     if pipeline is not None:
                         pipeline.try_insert(metric, date)
@@ -118,7 +121,7 @@ class Producer():
             producer = KafkaProducer(bootstrap_servers = host +':' +port)
             result = 'Producer successfully connected.'
         except NoBrokersAvailable as nba:
-            result = 'Error while trying to connect Producer: ' + str(nba)
+            result = 'Error while trying to connect to broker: ' + str(nba)
         
         return result
     

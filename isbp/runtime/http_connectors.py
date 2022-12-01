@@ -55,7 +55,7 @@ def get_sla_details(slaID):
     sla_url = 'http://'+lcm_ip+'/smart-contract-lifecycle-manager/api/v1/service-level-agreement/'
     response = None
     request = requests.get(sla_url+slaID)
-    log.info('SLA status: {0}'.format(request.status_code))
+    # log.info('SLA status: {0}'.format(request.status_code))
     if request.status_code == 200:
         response = json.loads(request.text)
         result = 'SLA details successfully retrieved'
@@ -64,9 +64,16 @@ def get_sla_details(slaID):
     
     return response, result
 
-def load_models(transactionid, models):
-    data = {'transactionid': transactionid, 'models': models}
+def load_models(transactionid, name, _class):
+    data = {'transactionid': transactionid, 'name': name, 'class': _class}
     data = json.dumps(data)
     request = requests.post('http://predictor:8001/load', data = data)
+    response = request.text
+    log.info(response)
+    
+def delete_transaction_folder(transactionid, model):
+    data = {'transactionid': transactionid, 'model': model}
+    data = json.dumps(data)
+    request = requests.delete('http://predictor:8001/unload', data = data)
     response = request.text
     log.info(response)

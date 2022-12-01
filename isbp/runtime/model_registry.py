@@ -84,10 +84,10 @@ class ModelRegistry():
      
     def get_model_by_name(name):
         global __registry
-        models = {}
+       
         model =__registry.get(name)
-        models[name] = model._class
-        return models
+        
+        return model
         
     
     def register_model(model: Model):
